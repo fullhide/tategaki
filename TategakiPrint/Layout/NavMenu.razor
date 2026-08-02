@@ -1,0 +1,29 @@
+﻿<div class="nav-scrollable" @onclick="ToggleNavMenu">
+    <nav class="flex-column">
+        <!-- 縦書き印刷ヘッダー -->
+        <div class="px-3 py-2 text-white fw-bold fs-5">
+            縦書き印刷
+        </div>
+
+        <!-- 寄付金一覧 リンク -->
+        <div class="nav-item px-3 mb-1">
+            <NavLink class="nav-link w-100 text-start" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-currency-yen me-2" aria-hidden="true"></span> 寄付金一覧
+            </NavLink>
+        </div>
+
+        <!-- 寄付品一覧 リンク -->
+        <div class="nav-item px-3 mb-1">
+            <NavLink class="nav-link w-100 text-start" href="goods">
+                <span class="bi bi-box-seam me-2" aria-hidden="true"></span> 寄付品一覧
+            </NavLink>
+        </div>
+    </nav>
+</div>
+
+@code {
+    // ナビゲーションメニューの開閉（標準テンプレートの処理）
+    private bool collapseNavMenu = true;
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+    private void ToggleNavMenu() => collapseNavMenu = !collapseNavMenu;
+}

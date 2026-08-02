@@ -1,0 +1,208 @@
+@using System.IO
+@using System.Text.Json
+@using TategakiPrint.Models
+@using TategakiPrint.Services
+@inject DonationState State
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div class="card p-3 mb-4 shadow-sm bg-light">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <!-- 左側：タイトルエリア -->
+        <div>
+            <h4 class="m-0">データ確認・編集</h4>
+            <small class="text-muted">全 @State.Items.Count 件（金額降順 ＞ かな ＞ ソート1〜3順で整列中）</small>
+        </div>
+
+        <!-- 右側：アクションボタン群 -->
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-primary" @onclick="ToggleImportPanel">
+                📁 Excel取り込み @(showImportPanel ? "▲" : "▼")
+            </button>
+            <button type="button" class="btn btn-outline-secondary" @onclick="ReSort">
+                🔄 既定順でソート再実行
+            </button>
+        </div>
+    </div>
+
+    <!-- Excelファイル取り込み展開パネル -->
+    @if (showImportPanel)
+    {
+        <div class="card p-3 mb-3 border-primary bg-white shadow-sm">
+            <h5 class="mb-2">Excelファイルの取り込み</h5>
+            
+            <div class="mb-3">
+                <div class="drop-zone p-3 text-center rounded border border-2 border-dashed position-relative bg-light">
+                    <div class="drop-zone-content">
+                        <span class="fs-4 text-primary me-2">📁</span>
+                        <span class="fw-bold text-secondary">
+                            @(State.FileBytes != null ? "新しいExcelファイルをドラッグ＆ドロップ、またはクリックして変更" : "Excelファイルをドラッグ＆ドロップ、またはクリックして選択")
+                        </span>
+                    </div>
+                    <InputFile OnChange="OnFileSelected" accept=".xlsx" class="file-input-overlay" />
+                </div>
+            </div>
+
+            @if (State.SheetNames.Any())
+            {
+                <div class="row g-2 align-items-center mb-2">
+                    <div class="col-auto">
+                        <label class="col-form-label fw-bold">シート選択:</label>
+                    </div>
+                    <div class="col-auto flex-grow-1">
+                        <select class="form-select form-select-sm" value="@State.SelectedSheetName" @onchange="OnSheetChangedAsync">
+                            @foreach (var sheet in State.SheetNames)
+                            {
+                                <option value="@sheet">@sheet</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-primary btn-sm px-3" @onclick="LoadSelectedSheet" disabled="@State.IsLoading">
+                            @(State.IsLoading ? "処理中..." : "取り込む")
+                        </button>
+                    </div>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(State.ErrorMessage))
+            {
+                <div class="alert alert-danger mb-0 p-2 fs-7" style="white-space: pre-wrap;">@State.ErrorMessage</div>
+            }
+        </div>
+    }
+
+    <!-- テーブル表示部 -->
+    <div class="table-responsive bg-white rounded shadow-sm border" style="max-height: 65vh; overflow-y: auto;">
+        <table class="table table-hover table-striped align-middle m-0">
+            <thead class="table-light sticky-top shadow-sm">
+                <tr>
+                    <th style="width: 50px;" class="text-center">#</th>
+                    <th>名前 (B列)</th>
+                    <th>かな (C列)</th>
+                    <th style="width: 140px;">金額 (J列)</th>
+                    <th style="width: 120px;">ソート1(*)</th>
+                    <th style="width: 120px;">ソート2(**)</th>
+                    <th style="width: 120px;">ソート3(***)</th>
+                    <th style="width: 60px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (int i = 0; i < State.Items.Count; i++)
+                {
+                    var index = i;
+                    var item = State.Items[index];
+                    <tr>
+                        <td class="text-center text-muted fw-bold">@(index + 1)</td>
+                        <td>
+                            <input type="text" class="form-control form-control-sm" @bind="item.Name" />
+                        </td>
+                        <td>
+                            <input type="text" class="form-control form-control-sm" @bind="item.Kana" />
+                        </td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm text-end" @bind="item.Amount" />
+                        </td>
+                        <td>
+                            <input type="text" class="form-control form-control-sm" @bind="item.SortKey1" />
+                        </td>
+                        <td>
+                            <input type="text" class="form-control form-control-sm" @bind="item.SortKey2" />
+                        </td>
+                        <td>
+                            <input type="text" class="form-control form-control-sm" @bind="item.SortKey3" />
+                        </td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-outline-danger btn-sm border-0" @onclick="() => RemoveItem(index)" title="削除">
+                                🗑
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+    .drop-zone {
+        border-color: #0d6efd !important;
+        transition: background-color 0.2s ease;
+    }
+    .drop-zone:hover {
+        background-color: #e9ecef !important;
+    }
+    .file-input-overlay {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        opacity: 0; cursor: pointer; z-index: 10;
+    }
+    .drop-zone-content { pointer-events: none; }
+    .fs-7 { font-size: 0.85rem; }
+</style>
+
+@code {
+    private bool showImportPanel = false;
+    protected override void OnInitialized()
+    {
+        State.OnChange += OnStateChanged;
+
+        // 初回でデータが空の場合は、取り込みパネルをデフォルトで開いておく
+        if (State.Items == null || !State.Items.Any())
+        {
+            showImportPanel = true;
+        }
+        State.SortItems();
+    }
+
+    public void Dispose()
+    {
+        State.OnChange -= OnStateChanged;
+    }
+
+    private void OnStateChanged()
+    {
+        StateHasChanged();
+    }
+
+    private void ToggleImportPanel() => showImportPanel = !showImportPanel;
+    private void ReSort() => State.SortItems();
+
+    private void RemoveItem(int index)
+    {
+        if (index >= 0 && index < State.Items.Count)
+        {
+            State.Items.RemoveAt(index);
+        }
+    }
+
+    private void GoToPrint()
+    {
+        State.SortItems();
+        State.ShowPrint();
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        using var stream = e.File.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
+        await State.SetFileAsync(stream, JS);
+    }
+
+    private async Task OnSheetChangedAsync(ChangeEventArgs e)
+    {
+        string newSheet = e.Value?.ToString() ?? string.Empty;
+        if (!string.IsNullOrEmpty(newSheet))
+        {
+            await State.ChangeSheetNameAsync(newSheet, JS);
+        }
+    }
+
+    private async Task LoadSelectedSheet()
+    {
+        await State.LoadSelectedSheetAsync(JS);
+        if (string.IsNullOrEmpty(State.ErrorMessage))
+        {
+            showImportPanel = false;
+        }
+    }
+}

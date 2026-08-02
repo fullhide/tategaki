@@ -1,0 +1,64 @@
+@page "/goods"
+@using TategakiPrint.Services
+@using TategakiPrint.Components
+@inject DonationGoodsState GoodsState
+@implements IDisposable
+
+<PageTitle>寄付品一覧 縦書き印刷</PageTitle>
+
+<div class="container-fluid py-3">
+    <h2 class="mb-4">寄付品一覧 縦書き印刷</h2>
+
+    <!-- タブ風ナビゲーション（印刷 / 編集 切り替え） -->
+    <div class="d-flex justify-content-center mb-4">
+        <div class="btn-group" role="group">
+            <button type="button" 
+                    class="btn @(GoodsState.CurrentView == ViewMode.Print ? "btn-primary font-weight-bold" : "btn-outline-secondary")"
+                    @onclick="GoodsState.ShowPrint">
+                縦書き印刷
+            </button>
+            <button type="button" 
+                    class="btn @(GoodsState.CurrentView == ViewMode.Edit ? "btn-primary font-weight-bold" : "btn-outline-secondary")"
+                    @onclick="GoodsState.ShowEdit">
+                データ確認・編集
+            </button>
+        </div>
+    </div>
+
+    <!-- コンテンツ表示切り替え -->
+    @switch (GoodsState.CurrentView)
+    {
+        case ViewMode.Edit:
+            <div class="alert alert-info text-center my-5">
+                寄付品データの確認・編集画面は準備中です。
+            </div>
+            @* DonationGoodsEdit.razor 作成後に下記コメント解除 *@
+            @* <DonationGoodsEdit /> *@
+            break;
+
+        case ViewMode.Print:
+            <DonationGoodsPrint />
+            break;
+
+        default:
+            <DonationGoodsPrint />
+            break;
+    }
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        GoodsState.OnChange += OnStateChanged;
+    }
+
+    private void OnStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        GoodsState.OnChange -= OnStateChanged;
+    }
+}

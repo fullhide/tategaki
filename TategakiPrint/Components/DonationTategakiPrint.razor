@@ -1,0 +1,1201 @@
+@using System.IO
+@using System.Text.Json
+@using TategakiPrint.Models
+@using TategakiPrint.Services
+@inject DonationState State
+@implements IDisposable
+
+<!-- 上部固定操作パネル（sticky-top-panel） -->
+<div class="card p-3 mb-4 shadow-sm no-print bg-light sticky-top-panel">
+    <div class="d-flex justify-content-between align-items-center">
+        <!-- 左側：戻るボタン ＋ タイトルエリア -->
+        <div class="d-flex align-items-center gap-3">
+            <div>
+                <h4 class="m-0">縦書きプレビュー・印刷</h4>
+                <small class="text-muted">
+                    全 @State.Items.Count 件（全 @PagedPages.Count ページ）/ 短冊のラジオボタンを選択してページ移動を行えます
+                </small>
+            </div>
+        </div>
+
+        <!-- 右側：設定・印刷・操作ボタン群 -->
+        <div class="d-flex gap-2 align-items-center">
+            <!-- 個別空行の非表示ボタン -->
+            @if (IsSelectedSpacer)
+            {
+                <button type="button" class="btn btn-outline-danger btn-sm" @onclick="RemoveSelectedSpacer">
+                    ✖ この空行（区切り）を非表示にする
+                </button>
+            }
+
+            <!-- ページ移動一括操作ボタン -->
+            <div class="btn-group me-1" role="group">
+                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="MoveSelectedAndPrevToPrevPage" disabled="@(!CanMoveToPrev)">
+                    ▲ 選択以前を前ページへ
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="MoveSelectedAndNextToNextPage" disabled="@(!CanMoveToNext)">
+                    選択以降を次ページへ ▼
+                </button>
+            </div>
+
+            <!-- Excelファイル取り込みトグルボタン -->
+            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="ToggleExcelImportPanel">
+                📁 Excel読み込み @(showExcelImport ? "▲" : "▼")
+            </button>
+
+            <!-- スライダー表示/非表示トグルボタン -->
+            <button type="button" class="btn btn-outline-dark btn-sm me-1" @onclick="ToggleAdvancedSettings">
+                ⚙ 詳細設定 @(showAdvancedSettings ? "▲" : "▼")
+            </button>
+
+            <!-- ファイル入出力ボタン -->
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ExportSettingsAsync" title="現在の設定をJSONファイルとしてダウンロードします">
+                📥 設定エクスポート
+            </button>
+            
+            <label class="btn btn-outline-secondary btn-sm mb-0 position-relative" title="設定ファイル(JSON)を読み込みます">
+                📤 設定インポート
+                <InputFile OnChange="ImportSettingsAsync" accept=".json" style="position:absolute; left:0; top:0; opacity:0; width:100%; height:100%; cursor:pointer;" />
+            </label>
+
+            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="ResetSettingsToDefaultAsync" title="設定パラメータを初期値に戻します">
+                リセット
+            </button>
+            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="ResetPages">
+                🔄 自動レイアウト初期化
+            </button>
+            <button type="button" class="btn btn-success px-4 font-weight-bold ms-2" @onclick="Print">
+                🖨 印刷する (A4横)
+            </button>
+        </div>
+    </div>
+
+    <!-- Excelファイル取り込みパネル（DonationDataEditと共通状態を参照） -->
+    @if (showExcelImport)
+    {
+        <div class="card p-3 mt-3 border-primary bg-white shadow-sm">
+            <h5 class="mb-2">Excelファイルの取り込み</h5>
+            
+            <div class="mb-3">
+                <div class="drop-zone p-3 text-center rounded border border-2 border-dashed position-relative bg-light">
+                    <div class="drop-zone-content">
+                        <span class="fs-4 text-primary me-2">📁</span>
+                        <span class="fw-bold text-secondary">
+                            @(State.FileBytes != null ? "新しいExcelファイルをドラッグ＆ドロップ、またはクリックして変更" : "Excelファイルをドラッグ＆ドロップ、またはクリックして選択")
+                        </span>
+                    </div>
+                    <InputFile OnChange="OnExcelFileSelected" accept=".xlsx" class="file-input-overlay" />
+                </div>
+            </div>
+
+            @if (State.SheetNames.Any())
+            {
+                <div class="row g-2 align-items-center mb-2">
+                    <div class="col-auto">
+                        <label class="col-form-label fw-bold">シート選択:</label>
+                    </div>
+                    <div class="col-auto flex-grow-1">
+                        <select class="form-select form-select-sm" value="@State.SelectedSheetName" @onchange="OnExcelSheetChangedAsync">
+                            @foreach (var sheet in State.SheetNames)
+                            {
+                                <option value="@sheet">@sheet</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-primary btn-sm px-3" @onclick="LoadSelectedExcelSheet" disabled="@State.IsLoading">
+                            @(State.IsLoading ? "処理中..." : "取り込む")
+                        </button>
+                    </div>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(State.ErrorMessage))
+            {
+                <div class="alert alert-danger mb-0 p-2 fs-7" style="white-space: pre-wrap;">@State.ErrorMessage</div>
+            }
+        </div>
+    }
+
+    <!-- フォント・サイズ・幅調整パネル（デフォルト非表示 / トグル切り替え） -->
+    @if (showAdvancedSettings)
+    {
+        <div class="border-top pt-3 mt-3">
+            <div class="row g-3 align-items-center mb-2">
+                <div class="col-md-3">
+                    <label class="form-label font-weight-bold mb-1"><small>フォント種類</small></label>
+                    <select class="form-select form-select-sm" value="@Settings.SelectedFont" @onchange="OnFontChangedAsync">
+                        <option value='"HG行書体", "HGP行書体", "Kaiti SC", "STKaiti", "Yu Mincho", serif'>行書体 / 楷書体（推奨）</option>
+                        <option value='"HG正楷書体-PRO", "HGP正楷書体-PRO", "UD Digi Kyokasho N-R", "Kaiti SC", serif'>正楷書体 / 教科書体</option>
+                        <option value='"HGP教科書体", "UD Digi Kyokasho N-B", "Kaiti SC", serif'>教科書体</option>
+                        <option value='"Hiragino Mincho ProN", "Yu Mincho", "MS Mincho", serif'>明朝体（標準）</option>
+                        <option value='"Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif'>ゴシック体（角ゴ）</option>
+                        <option value='"HG丸ゴシックM-PRO", "Hiragino Maru Gothic ProN", "Yu Gothic", sans-serif'>丸ゴシック体</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label font-weight-bold mb-1"><small>初期計算用の目標ページ幅</small></label>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="range" class="form-range" min="10.0" max="30.0" step="0.5" value="@Settings.MaxPageWidthUnits" @oninput="OnMaxPageWidthInputAsync" />
+                        <input type="number" class="form-control form-control-sm text-center" style="width: 70px;" min="10.0" max="30.0" step="0.5" value="@Settings.MaxPageWidthUnits" @onchange="OnMaxPageWidthInputAsync" />
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label font-weight-bold mb-1"><small>お名前サイズ (rem)</small></label>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="range" class="form-range" min="0.6" max="2.5" step="0.02" value="@Settings.NameFontSize" @oninput="OnNameFontSizeInputAsync" />
+                        <input type="number" class="form-control form-control-sm text-center" style="width: 70px;" min="0.6" max="2.5" step="0.02" value="@Settings.NameFontSize" @onchange="OnNameFontSizeInputAsync" />
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label font-weight-bold mb-1"><small>金額サイズ (rem)</small></label>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="range" class="form-range" min="0.6" max="2.5" step="0.02" value="@Settings.AmountFontSize" @oninput="OnAmountFontSizeInputAsync" />
+                        <input type="number" class="form-control form-control-sm text-center" style="width: 70px;" min="0.6" max="2.5" step="0.02" value="@Settings.AmountFontSize" @onchange="OnAmountFontSizeInputAsync" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 align-items-center mb-2">
+                <div class="col-md-3">
+                    <label class="form-label font-weight-bold mb-1"><small>1行短冊の幅倍率</small></label>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="range" class="form-range" min="0.5" max="2.0" step="0.1" value="@Settings.SingleLineWidth" @oninput="OnSingleLineWidthInputAsync" />
+                        <input type="number" class="form-control form-control-sm text-center" style="width: 70px;" min="0.5" max="2.0" step="0.1" value="@Settings.SingleLineWidth" @onchange="OnSingleLineWidthInputAsync" />
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label font-weight-bold mb-1"><small>複数行短冊の幅倍率</small></label>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="range" class="form-range" min="1.0" max="3.5" step="0.1" value="@Settings.MultiLineWidth" @oninput="OnMultiLineWidthInputAsync" />
+                        <input type="number" class="form-control form-control-sm text-center" style="width: 70px;" min="1.0" max="3.5" step="0.1" value="@Settings.MultiLineWidth" @onchange="OnMultiLineWidthInputAsync" />
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label font-weight-bold mb-1"><small>複数行の行間 (em)</small></label>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="range" class="form-range" min="-0.2" max="0.5" step="0.02" value="@Settings.LineGap" @oninput="OnLineGapInputAsync" />
+                        <input type="number" class="form-control form-control-sm text-center" style="width: 70px;" min="-0.2" max="0.5" step="0.02" value="@Settings.LineGap" @onchange="OnLineGapInputAsync" />
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label font-weight-bold mb-1"><small>空行（区切り）の幅倍率</small></label>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="range" class="form-range" min="0" max="2.0" step="0.1" value="@Settings.SpacerWidth" @oninput="OnSpacerWidthInputAsync" />
+                        <input type="number" class="form-control form-control-sm text-center" style="width: 70px;" min="0" max="2.0" step="0.1" value="@Settings.SpacerWidth" @onchange="OnSpacerWidthInputAsync" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- 縦位置調整スライダー群 -->
+            <div class="row g-3 align-items-center pt-2 border-top">
+                <div class="col-md-4">
+                    <label class="form-label font-weight-bold mb-1"><small>お名前 縦位置 (px)</small></label>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="range" class="form-range" min="-100" max="150" step="1" value="@Settings.NameTopOffset" @oninput="OnNameTopOffsetInputAsync" />
+                        <input type="number" class="form-control form-control-sm text-center" style="width: 75px;" min="-100" max="150" step="1" value="@Settings.NameTopOffset" @onchange="OnNameTopOffsetInputAsync" />
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label font-weight-bold mb-1"><small>「金」 縦位置 (px)</small></label>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="range" class="form-range" min="-100" max="150" step="1" value="@Settings.KinTopOffset" @oninput="OnKinTopOffsetInputAsync" />
+                        <input type="number" class="form-control form-control-sm text-center" style="width: 75px;" min="-100" max="150" step="1" value="@Settings.KinTopOffset" @onchange="OnKinTopOffsetInputAsync" />
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label font-weight-bold mb-1"><small>金額 縦位置 (px)</small></label>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="range" class="form-range" min="-100" max="150" step="1" value="@Settings.AmountTopOffset" @oninput="OnAmountTopOffsetInputAsync" />
+                        <input type="number" class="form-control form-control-sm text-center" style="width: 75px;" min="-100" max="150" step="1" value="@Settings.AmountTopOffset" @onchange="OnAmountTopOffsetInputAsync" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="print-container bg-white mx-auto shadow-sm" style="@DynamicCssVariables">
+    @for (int pIdx = 0; pIdx < PagedPages.Count; pIdx++)
+    {
+        var pageIndex = pIdx;
+        var pageItems = PagedPages[pageIndex];
+
+        <div class="print-page">
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3 no-print">
+                <span class="badge bg-secondary fs-6">ページ @(pageIndex + 1) / @PagedPages.Count（件数: @pageItems.Count(i => !i.IsSpacer) 件）</span>
+            </div>
+
+            <div class="honochou-grid">
+                @for (int iIdx = 0; iIdx < pageItems.Count; iIdx++)
+                {
+                    var printable = pageItems[iIdx];
+                    bool isSelected = (SelectedItemId == printable.Id);
+
+                    @if (printable.IsSpacer)
+                    {
+                        <div class="honochou-card is-spacer @(isSelected ? "is-selected" : "")" 
+                             @onclick="() => SelectItem(printable.Id)"
+                             title="クリックしてこの空行を選択できます">
+                            <div class="item-selector-header no-print">
+                                <input type="radio" 
+                                       name="entry-selection" 
+                                       checked="@isSelected" 
+                                       @onchange="() => SelectItem(printable.Id)" 
+                                       @onclick:stopPropagation="true" />
+                            </div>
+                            <div class="spacer-label no-print">
+                                <small class="text-muted" style="writing-mode: vertical-rl; font-size: 10px;">[区切り]</small>
+                            </div>
+                        </div>
+                    }
+                    else if (printable.Item != null)
+                    {
+                        var item = printable.Item;
+                        bool isMulti = IsMultiLine(item.Name);
+
+                        <div class="honochou-card @(isMulti ? "is-multi-line" : "is-single-line") @(isSelected ? "is-selected" : "")" @onclick="() => SelectItem(printable.Id)">
+                            <div class="item-selector-header no-print">
+                                <input type="radio" 
+                                       name="entry-selection" 
+                                       checked="@isSelected" 
+                                       @onchange="() => SelectItem(printable.Id)" 
+                                       @onclick:stopPropagation="true" />
+                            </div>
+
+                            <div class="grid-name-section">
+                                <div class="vertical-text">
+                                    @((MarkupString)FormatVerticalName(item.Name))
+                                </div>
+                            </div>
+
+                            <div class="grid-kin-section">
+                                <div class="vertical-text-single">
+                                    金
+                                </div>
+                            </div>
+
+                            <div class="grid-amount-section">
+                                <div class="vertical-text-single">
+                                    @FormatAmountToKanji(item.Amount)円
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    /* ドロップゾーン（DonationDataEdit と統一） */
+    .drop-zone {
+        border-color: #0d6efd !important;
+        transition: background-color 0.2s ease;
+    }
+    .drop-zone:hover {
+        background-color: #e9ecef !important;
+    }
+    .file-input-overlay {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        opacity: 0; cursor: pointer; z-index: 10;
+    }
+    .drop-zone-content { pointer-events: none; }
+    .fs-7 { font-size: 0.85rem; }
+
+    .sticky-top-panel {
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+    }
+
+    .print-container {
+        width: 100%;
+        max-width: 1300px;
+        background-color: #fff;
+        padding: 10px;
+        box-sizing: border-box;
+    }
+
+    .print-page {
+        margin-bottom: 40px;
+        border-bottom: 2px dashed #999;
+        padding: 10px;
+        box-sizing: border-box;
+        overflow: visible;
+    }
+
+    .honochou-grid {
+        display: flex;
+        flex-direction: row;
+        direction: rtl; 
+        justify-content: flex-start;
+        align-items: stretch;
+        gap: 0;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .honochou-card {
+        position: relative;
+        writing-mode: horizontal-tb;
+        font-family: var(--print-font);
+        min-height: 540px;
+        border-left: 1px dashed #ddd;
+        padding: 4px 2px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
+        min-width: 0;
+        cursor: pointer;
+        transition: background-color 0.15s ease-in-out;
+    }
+
+    .honochou-card.is-spacer {
+        flex: 0 0 calc(var(--spacer-flex) * 48px);
+        border-left: none !important;
+        background-color: transparent !important;
+        cursor: pointer;
+    }
+
+    .honochou-card.is-spacer:hover {
+        background-color: rgba(0, 0, 0, 0.03) !important;
+    }
+
+    .honochou-card:not(.is-spacer):hover {
+        background-color: #f8f9fa;
+    }
+
+    .honochou-card.is-selected {
+        background-color: #e7f1ff;
+        outline: 2px solid #0d6efd;
+        z-index: 1;
+    }
+
+    .item-selector-header {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding-bottom: 4px;
+        border-bottom: 1px dotted #ccc;
+        margin-bottom: 4px;
+    }
+
+    .item-selector-header input[type="radio"] {
+        cursor: pointer;
+        width: 16px;
+        height: 16px;
+    }
+
+    .honochou-card.is-single-line {
+        flex: 0 0 calc(var(--single-flex) * 48px);
+    }
+
+    .honochou-card.is-multi-line {
+        flex: 0 0 calc(var(--multi-flex) * 48px);
+    }
+
+    .grid-name-section {
+        flex: 1 1 auto;
+        width: 100%;
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        align-items: flex-start;
+        font-size: var(--name-size);
+        overflow: hidden;
+        padding-top: 4px;
+        transform: translateY(var(--name-top-offset));
+        line-height: 1.1;
+    }
+
+    .vertical-text {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        align-items: flex-start;
+    }
+
+    .is-multi-line .v-line {
+        margin: 0 var(--line-gap) !important;
+    }
+
+    .is-single-line .v-line {
+        margin: 0 !important;
+    }
+
+    .v-line {
+        writing-mode: vertical-rl;
+        -webkit-writing-mode: vertical-rl;
+        text-orientation: upright;
+        -webkit-text-orientation: upright;
+        font-feature-settings: "vert" 1, "vrt2" 1;
+        -webkit-font-feature-settings: "vert" 1, "vrt2" 1;
+        white-space: nowrap;
+        padding: 0 !important;
+    }
+
+    .vertical-text-single {
+        writing-mode: vertical-rl;
+        -webkit-writing-mode: vertical-rl;
+        text-orientation: mixed;
+        font-feature-settings: "vert" 1, "vrt2" 1;
+        -webkit-font-feature-settings: "vert" 1, "vrt2" 1;
+        white-space: nowrap;
+    }
+
+    .grid-kin-section {
+        height: 2.2em;
+        flex: 0 0 2.2em;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: var(--amount-size);
+        margin-bottom: 2em;
+        transform: translateY(var(--kin-top-offset));
+    }
+
+    .grid-amount-section {
+        height: 6em;
+        flex: 0 0 6em;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        font-size: var(--amount-size);
+        overflow: hidden;
+        transform: translateY(var(--amount-top-offset));
+    }
+
+    @@media print {
+        @@page {
+            size: A4 landscape;
+            margin: 0;
+        }
+
+        html, body {
+            background: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .no-print, nav, header, footer {
+            display: none !important;
+        }
+
+        body * {
+            visibility: hidden;
+        }
+
+        .print-container, .print-container * {
+            visibility: visible;
+        }
+
+        .print-container {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100vw !important;
+            max-width: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+        }
+
+        .print-page {
+            width: 100vw !important;
+            height: 100vh !important;
+            max-height: 100vh !important;
+            page-break-after: always !important;
+            break-after: page !important;
+            margin: 0 !important;
+            padding: 8mm 10mm !important;
+            border: none !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
+        }
+
+        .honochou-grid {
+            display: flex !important;
+            flex-direction: row !important;
+            direction: rtl !important;
+            justify-content: flex-start !important;
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
+        }
+
+        .honochou-card {
+            height: 100% !important;
+            min-height: 0 !important;
+            font-family: var(--print-font) !important;
+            padding: 2mm 0 !important;
+            border-left: 1px dashed #ddd !important;
+            box-sizing: border-box !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            outline: none !important;
+            background-color: transparent !important;
+        }
+
+        .honochou-card.is-spacer {
+            border-left: none !important;
+            flex: 0 0 calc(var(--spacer-flex) * 48px) !important;
+        }
+
+        .honochou-card.is-single-line {
+            flex: 0 0 calc(var(--single-flex) * 48px) !important;
+        }
+
+        .honochou-card.is-multi-line {
+            flex: 0 0 calc(var(--multi-flex) * 48px) !important;
+        }
+
+        .grid-name-section {
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: center !important;
+            align-items: flex-start !important;
+            font-size: var(--name-size) !important;
+            padding-top: 4px !important;
+            transform: translateY(var(--name-top-offset)) !important;
+        }
+
+        .is-multi-line .v-line {
+            margin: 0 var(--line-gap) !important;
+        }
+
+        .is-single-line .v-line {
+            margin: 0 !important;
+        }
+
+        .grid-kin-section {
+            height: 8mm !important;
+            flex: 0 0 8mm !important;
+            font-size: var(--amount-size) !important;
+            margin-bottom: 8mm !important;
+            transform: translateY(var(--kin-top-offset)) !important;
+        }
+
+        .grid-amount-section {
+            height: 32mm !important;
+            flex: 0 0 32mm !important;
+            font-size: var(--amount-size) !important;
+            transform: translateY(var(--amount-top-offset)) !important;
+        }
+    }
+</style>
+
+@code {
+    [Inject] IJSRuntime JS { get; set; } = default!;
+
+    private const string LocalStorageKey = "TategakiPrint_Settings";
+    private const string DefaultFont = "\"HG行書体\", \"HGP行書体\", \"Kaiti SC\", \"STKaiti\", \"Yu Mincho\", serif";
+
+    private bool showAdvancedSettings = false;
+    private bool showExcelImport = false;
+
+    public class PrintableEntry
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public DonationItem? Item { get; set; }
+        public bool IsSpacer { get; set; }
+    }
+
+    private PrintSettings Settings { get; set; } = new PrintSettings
+    {
+        SelectedFont = DefaultFont
+    };
+
+    private string DynamicCssVariables =>
+        $"--print-font: {Settings.SelectedFont}; " +
+        $"--name-size: {Settings.NameFontSize}rem; " +
+        $"--amount-size: {Settings.AmountFontSize}rem; " +
+        $"--single-flex: {Settings.SingleLineWidth}; " +
+        $"--multi-flex: {Settings.MultiLineWidth}; " +
+        $"--spacer-flex: {Settings.SpacerWidth}; " +
+        $"--line-gap: {Settings.LineGap}em; " +
+        $"--name-top-offset: {Settings.NameTopOffset}px; " +
+        $"--kin-top-offset: {Settings.KinTopOffset}px; " +
+        $"--amount-top-offset: {Settings.AmountTopOffset}px;";
+
+    private List<List<PrintableEntry>> PagedPages { get; set; } = new();
+    private string? SelectedItemId { get; set; }
+
+    private bool IsSelectedSpacer
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(SelectedItemId)) return false;
+            return PagedPages.SelectMany(p => p).Any(i => i.IsSpacer && i.Id == SelectedItemId);
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        State.OnChange += OnStateChanged;
+
+        // データが0件の場合はデフォルトでExcel取り込みエリアを展開する
+        if (State.Items == null || !State.Items.Any())
+        {
+            showExcelImport = true;
+        }
+
+        ResetPages();
+    }
+
+    public void Dispose()
+    {
+        State.OnChange -= OnStateChanged;
+    }
+
+    private void OnStateChanged()
+    {
+        ResetPages();
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadSettingsAsync();
+            ResetPages();
+            StateHasChanged();
+        }
+    }
+
+    private void ToggleAdvancedSettings() => showAdvancedSettings = !showAdvancedSettings;
+    private void ToggleExcelImportPanel() => showExcelImport = !showExcelImport;
+
+    #region Excel読み込み処理 (DonationStateに委譲)
+
+    private async Task OnExcelFileSelected(InputFileChangeEventArgs e)
+    {
+        using var stream = e.File.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
+        await State.SetFileAsync(stream, JS);
+    }
+
+    private async Task OnExcelSheetChangedAsync(ChangeEventArgs e)
+    {
+        string newSheet = e.Value?.ToString() ?? string.Empty;
+        if (!string.IsNullOrEmpty(newSheet))
+        {
+            await State.ChangeSheetNameAsync(newSheet, JS);
+        }
+    }
+
+    private async Task LoadSelectedExcelSheet()
+    {
+        await State.LoadSelectedSheetAsync(JS);
+        if (string.IsNullOrEmpty(State.ErrorMessage))
+        {
+            showExcelImport = false;
+        }
+    }
+
+    #endregion
+
+    private void SelectItem(string id) => SelectedItemId = id;
+
+    private void RemoveSelectedSpacer()
+    {
+        if (string.IsNullOrEmpty(SelectedItemId)) return;
+
+        foreach (var page in PagedPages)
+        {
+            var targetSpacer = page.FirstOrDefault(i => i.IsSpacer && i.Id == SelectedItemId);
+            if (targetSpacer != null)
+            {
+                page.Remove(targetSpacer);
+                CleanUpEmptyPages();
+                SelectedItemId = null;
+                StateHasChanged();
+                break;
+            }
+        }
+    }
+
+    #region 移動ボタンの活性状態判定
+
+    private (int pageIndex, int itemIndex)? GetSelectedItemPosition()
+    {
+        if (string.IsNullOrEmpty(SelectedItemId)) return null;
+
+        for (int p = 0; p < PagedPages.Count; p++)
+        {
+            int idx = PagedPages[p].FindIndex(i => i.Id == SelectedItemId);
+            if (idx >= 0) return (p, idx);
+        }
+        return null;
+    }
+
+    private bool CanMoveToNext => GetSelectedItemPosition().HasValue;
+    private bool CanMoveToPrev => GetSelectedItemPosition() is { pageIndex: > 0 };
+
+    #endregion
+
+    #region 範囲移動処理
+
+    private void MoveSelectedAndNextToNextPage()
+    {
+        var pos = GetSelectedItemPosition();
+        if (!pos.HasValue) return;
+
+        int pageIdx = pos.Value.pageIndex;
+        int itemIdx = pos.Value.itemIndex;
+
+        var currentPage = PagedPages[pageIdx];
+        int targetNextPageIdx = pageIdx + 1;
+
+        if (targetNextPageIdx >= PagedPages.Count)
+        {
+            PagedPages.Add(new List<PrintableEntry>());
+        }
+
+        var itemsToMove = currentPage.Skip(itemIdx).ToList();
+        currentPage.RemoveRange(itemIdx, itemsToMove.Count);
+
+        PagedPages[targetNextPageIdx].InsertRange(0, itemsToMove);
+
+        CleanUpEmptyPages();
+    }
+
+    private void MoveSelectedAndPrevToPrevPage()
+    {
+        var pos = GetSelectedItemPosition();
+        if (!pos.HasValue || pos.Value.pageIndex <= 0) return;
+
+        int pageIdx = pos.Value.pageIndex;
+        int itemIdx = pos.Value.itemIndex;
+
+        var currentPage = PagedPages[pageIdx];
+        int targetPrevPageIdx = pageIdx - 1;
+
+        var itemsToMove = currentPage.Take(itemIdx + 1).ToList();
+        currentPage.RemoveRange(0, itemsToMove.Count);
+
+        PagedPages[targetPrevPageIdx].AddRange(itemsToMove);
+
+        CleanUpEmptyPages();
+    }
+
+    private void CleanUpEmptyPages()
+    {
+        for (int i = PagedPages.Count - 1; i >= 0; i--)
+        {
+            if (!PagedPages[i].Any(x => !x.IsSpacer) && PagedPages.Count > 1)
+            {
+                PagedPages.RemoveAt(i);
+            }
+        }
+    }
+
+    #endregion
+
+    #region localStorage Persistence & Export/Import Methods
+
+    private async Task LoadSettingsAsync()
+    {
+        try
+        {
+            var json = await JS.InvokeAsync<string>("localStorage.getItem", LocalStorageKey);
+            if (!string.IsNullOrWhiteSpace(json))
+            {
+                var loaded = JsonSerializer.Deserialize<PrintSettings>(json);
+                if (loaded != null)
+                {
+                    Settings = loaded;
+                    if (string.IsNullOrWhiteSpace(Settings.SelectedFont))
+                    {
+                        Settings.SelectedFont = DefaultFont;
+                    }
+                }
+            }
+        }
+        catch { }
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(Settings);
+            await JS.InvokeVoidAsync("localStorage.setItem", LocalStorageKey, json);
+        }
+        catch { }
+    }
+
+    private async Task ResetSettingsToDefaultAsync()
+    {
+        Settings = new PrintSettings { SelectedFont = DefaultFont };
+        await JS.InvokeVoidAsync("localStorage.removeItem", LocalStorageKey);
+        ResetPages();
+    }
+
+    private async Task ExportSettingsAsync()
+    {
+        var json = JsonSerializer.Serialize(Settings, new JsonSerializerOptions { WriteIndented = true });
+        var fileName = $"寄付金縦書き設定_{DateTime.Now:yyyyMMdd_HHmmss}.json";
+        
+        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+        var base64 = Convert.ToBase64String(bytes);
+        
+        var jsCode = $@"
+            const link = document.createElement('a');
+            link.download = '{fileName}';
+            link.href = 'data:application/json;base64,' + '{base64}';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        ";
+        await JS.InvokeVoidAsync("eval", jsCode);
+    }
+
+    private async Task ImportSettingsAsync(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+            if (file != null)
+            {
+                using var stream = file.OpenReadStream(maxAllowedSize: 1024 * 1024);
+                using var reader = new System.IO.StreamReader(stream);
+                var json = await reader.ReadToEndAsync();
+
+                var loaded = JsonSerializer.Deserialize<PrintSettings>(json);
+                if (loaded != null)
+                {
+                    Settings = loaded;
+                    if (string.IsNullOrWhiteSpace(Settings.SelectedFont))
+                    {
+                        Settings.SelectedFont = DefaultFont;
+                    }
+                    await SaveSettingsAsync();
+                    ResetPages();
+                    StateHasChanged();
+                }
+            }
+        }
+        catch { }
+    }
+
+    #endregion
+
+    #region Input Event Handlers (Auto Save)
+
+    private async Task OnFontChangedAsync(ChangeEventArgs e)
+    {
+        Settings.SelectedFont = e.Value?.ToString() ?? DefaultFont;
+        await SaveSettingsAsync();
+    }
+
+    private async Task OnMaxPageWidthInputAsync(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out double val))
+        {
+            Settings.MaxPageWidthUnits = val;
+            await SaveSettingsAsync();
+        }
+    }
+
+    private async Task OnNameFontSizeInputAsync(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out double val))
+        {
+            Settings.NameFontSize = val;
+            await SaveSettingsAsync();
+        }
+    }
+
+    private async Task OnAmountFontSizeInputAsync(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out double val))
+        {
+            Settings.AmountFontSize = val;
+            await SaveSettingsAsync();
+        }
+    }
+
+    private async Task OnSingleLineWidthInputAsync(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out double val))
+        {
+            Settings.SingleLineWidth = val;
+            await SaveSettingsAsync();
+        }
+    }
+
+    private async Task OnMultiLineWidthInputAsync(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out double val))
+        {
+            Settings.MultiLineWidth = val;
+            await SaveSettingsAsync();
+        }
+    }
+
+    private async Task OnLineGapInputAsync(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out double val))
+        {
+            Settings.LineGap = val;
+            await SaveSettingsAsync();
+        }
+    }
+
+    private async Task OnNameTopOffsetInputAsync(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out double val))
+        {
+            Settings.NameTopOffset = val;
+            await SaveSettingsAsync();
+        }
+    }
+
+    private async Task OnKinTopOffsetInputAsync(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out double val))
+        {
+            Settings.KinTopOffset = val;
+            await SaveSettingsAsync();
+        }
+    }
+
+    private async Task OnAmountTopOffsetInputAsync(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out double val))
+        {
+            Settings.AmountTopOffset = val;
+            await SaveSettingsAsync();
+        }
+    }
+
+    private async Task OnSpacerWidthInputAsync(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), out double val))
+        {
+            Settings.SpacerWidth = val;
+            await SaveSettingsAsync();
+            ResetPages();
+        }
+    }
+
+    #endregion
+
+    private void ResetPages()
+    {
+        PagedPages = new List<List<PrintableEntry>>();
+        if (State.Items == null || !State.Items.Any()) return;
+
+        var currentPage = new List<PrintableEntry>();
+        double currentWidthSum = 0;
+        double effectiveMax = Settings.MaxPageWidthUnits - 0.05;
+
+        decimal? previousAmount = null;
+
+        foreach (var item in State.Items)
+        {
+            if (previousAmount.HasValue && previousAmount.Value != item.Amount)
+            {
+                double spacerWidth = Settings.SpacerWidth;
+
+                if (spacerWidth > 0)
+                {
+                    if (currentWidthSum + spacerWidth > effectiveMax && currentPage.Any())
+                    {
+                        PagedPages.Add(currentPage);
+                        currentPage = new List<PrintableEntry>();
+                        currentWidthSum = 0;
+                    }
+                    else
+                    {
+                        currentPage.Add(new PrintableEntry { IsSpacer = true });
+                        currentWidthSum += spacerWidth;
+                    }
+                }
+            }
+
+            previousAmount = item.Amount;
+
+            double itemWidth = IsMultiLine(item.Name) ? Settings.MultiLineWidth : Settings.SingleLineWidth;
+
+            if (currentWidthSum + itemWidth > effectiveMax && currentPage.Any())
+            {
+                PagedPages.Add(currentPage);
+                currentPage = new List<PrintableEntry>();
+                currentWidthSum = 0;
+            }
+
+            currentPage.Add(new PrintableEntry { Item = item, IsSpacer = false });
+            currentWidthSum += itemWidth;
+        }
+
+        if (currentPage.Any())
+        {
+            PagedPages.Add(currentPage);
+        }
+
+        if (State.Items.Any())
+        {
+            var firstEntry = PagedPages.FirstOrDefault()?.FirstOrDefault();
+            if (firstEntry != null)
+            {
+                SelectedItemId = firstEntry.Id;
+            }
+        }
+    }
+
+    private void GoBack() => State.ShowEdit();
+    private async Task Print() => await JS.InvokeVoidAsync("print");
+
+    private bool IsMultiLine(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return false;
+        return input.Contains('/') || input.Contains('／');
+    }
+
+    private string FormatVerticalName(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return string.Empty;
+
+        string clean = input.Trim();
+        if (clean.EndsWith("様")) clean = clean.Substring(0, clean.Length - 1).Trim();
+        if (clean.EndsWith("殿")) clean = clean.Substring(0, clean.Length - 1).Trim();
+
+        var parts = clean.Split(new[] { '/', '／' }, StringSplitOptions.RemoveEmptyEntries);
+        var sb = new System.Text.StringBuilder();
+
+        for (int i = 0; i < parts.Length; i++)
+        {
+            string processed = ProcessSegment(parts[i].Trim());
+            if (i == parts.Length - 1)
+            {
+                processed += " 様";
+            }
+            sb.Append($"<div class=\"v-line\">{processed}</div>");
+        }
+
+        return sb.ToString();
+    }
+
+    private string ProcessSegment(string segment)
+    {
+        if (string.IsNullOrEmpty(segment)) return string.Empty;
+
+        var sb = new System.Text.StringBuilder();
+
+        foreach (char c in segment)
+        {
+            if (c == '(') { sb.Append('（'); continue; }
+            if (c == ')') { sb.Append('）'); continue; }
+
+            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))
+            {
+                char fullWidth = (char)(c + 0xfee0);
+                sb.Append(fullWidth);
+            }
+            else if (c == '\u3000')
+            {
+                sb.Append('\u0020');
+            }
+            else
+            {
+                sb.Append(System.Net.WebUtility.HtmlEncode(c.ToString()));
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    private string FormatAmountToKanji(decimal amount)
+    {
+        long val = (long)amount;
+
+        if (val >= 10000)
+        {
+            long man = val / 10000;
+            long remainder = val % 10000;
+
+            string manStr = man switch
+            {
+                1 => "壱萬",
+                2 => "弐萬",
+                3 => "参萬",
+                5 => "伍萬",
+                10 => "拾萬",
+                _ => ConvertToDaiji(man) + "萬"
+            };
+
+            if (remainder == 0) return manStr;
+
+            return manStr + ConvertToNormalKanji(remainder);
+        }
+
+        return ConvertToNormalKanji(val);
+    }
+
+    private string ConvertToNormalKanji(long number)
+    {
+        if (number == 0) return "零";
+
+        string[] units = { "", "十", "百", "千" };
+        string[] digits = { "", "一", "二", "三", "四", "五", "六", "七", "八", "九" };
+
+        var sb = new System.Text.StringBuilder();
+        string numStr = number.ToString();
+        int len = numStr.Length;
+
+        for (int i = 0; i < len; i++)
+        {
+            int d = numStr[i] - '0';
+            int unitIdx = len - 1 - i;
+
+            if (d != 0)
+            {
+                sb.Append(digits[d]);
+                if (unitIdx > 0)
+                {
+                    sb.Append(units[unitIdx]);
+                }
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    private string ConvertToDaiji(long number)
+    {
+        string[] daijiDigits = { "", "壱", "弐", "参", "四", "伍", "六", "七", "八", "九" };
+        var sb = new System.Text.StringBuilder();
+        foreach (char c in number.ToString())
+        {
+            int d = c - '0';
+            sb.Append(daijiDigits[d]);
+        }
+        return sb.ToString();
+    }
+}

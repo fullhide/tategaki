@@ -1,0 +1,58 @@
+@page "/"
+@using TategakiPrint.Services
+@using TategakiPrint.Components
+@inject DonationState State
+@implements IDisposable
+
+<PageTitle>寄付金一覧 縦書き印刷</PageTitle>
+
+<div class="container-fluid py-3">
+    <h2 class="mb-4">寄付金一覧 縦書き印刷</h2>
+
+    <!-- タブ風ナビゲーション（印刷 / 編集 切り替え） -->
+    <div class="d-flex justify-content-center mb-4">
+        <div class="btn-group" role="group">
+            <button type="button" 
+                    class="btn @(State.CurrentView == ViewMode.Print ? "btn-primary font-weight-bold" : "btn-outline-secondary")"
+                    @onclick="State.ShowPrint">
+                縦書き印刷
+            </button>
+            <button type="button" 
+                    class="btn @(State.CurrentView == ViewMode.Edit ? "btn-primary font-weight-bold" : "btn-outline-secondary")"
+                    @onclick="State.ShowEdit">
+                データ確認・編集
+            </button>
+        </div>
+    </div>
+
+    <!-- コンテンツ表示切り替え -->
+    @switch (State.CurrentView)
+    {
+        case ViewMode.Edit:
+            <DonationDataEdit />
+            break;
+        case ViewMode.Print:
+            <DonationTategakiPrint />
+            break;
+        default:
+            <DonationTategakiPrint />
+            break;
+    }
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        State.OnChange += OnStateChanged;
+    }
+
+    private void OnStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        State.OnChange -= OnStateChanged;
+    }
+}
