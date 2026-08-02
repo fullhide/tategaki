@@ -28,11 +28,17 @@ jobs:
           REPO_NAME=${{ github.event.repository.name }}
           sed -i 's|<base href="/" />|<base href="/'"$REPO_NAME"'/" />|g' TategakiPrint/wwwroot/index.html
 
-      # .NET アプリのビルドと公開（出力先を release に変更してルートを平坦化）
+      # .NET アプリのビルドと公開
       - name: Publish .NET App
         run: dotnet publish TategakiPrint/TategakiPrint.csproj -c Release -o release
 
-      # Publish完了後の成果物フォルダへ .nojekyll を確実に追加する
+      # wwwroot 階層をフラットにしてルート直下に index.html を配置する
+      - name: Flatten directory structure
+        run: |
+          cp -r release/wwwroot/* release/
+          rm -rf release/wwwroot
+
+      # 成果物フォルダのルートへ .nojekyll を配置する
       - name: Add .nojekyll to publish output
         run: touch release/.nojekyll
 
