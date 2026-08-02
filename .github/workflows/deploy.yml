@@ -28,12 +28,13 @@ jobs:
           REPO_NAME=${{ github.event.repository.name }}
           sed -i 's|<base href="/" />|<base href="/'"$REPO_NAME"'/" />|g' TategakiPrint/wwwroot/index.html
 
-      # .nojekyll をビルド成果物（wwwroot）にコピーする
-      - name: Copy .nojekyll
-        run: cp TategakiPrint/wwwroot/.nojekyll TategakiPrint/wwwroot/wwwroot/.nojekyll || touch TategakiPrint/wwwroot/.nojekyll
-
+      # .NET アプリのビルドと公開（出力先: release/wwwroot）
       - name: Publish .NET App
         run: dotnet publish TategakiPrint/TategakiPrint.csproj -c Release -o release/wwwroot
+
+      # Publish完了後の成果物フォルダへ .nojekyll を確実に追加する
+      - name: Add .nojekyll to publish output
+        run: touch release/wwwroot/.nojekyll
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
