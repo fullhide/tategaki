@@ -28,18 +28,18 @@ jobs:
           REPO_NAME=${{ github.event.repository.name }}
           sed -i 's|<base href="/" />|<base href="/'"$REPO_NAME"'/" />|g' TategakiPrint/wwwroot/index.html
 
-      # .NET アプリのビルドと公開（出力先: release/wwwroot）
+      # .NET アプリのビルドと公開（出力先を release に変更してルートを平坦化）
       - name: Publish .NET App
-        run: dotnet publish TategakiPrint/TategakiPrint.csproj -c Release -o release/wwwroot
+        run: dotnet publish TategakiPrint/TategakiPrint.csproj -c Release -o release
 
       # Publish完了後の成果物フォルダへ .nojekyll を確実に追加する
       - name: Add .nojekyll to publish output
-        run: touch release/wwwroot/.nojekyll
+        run: touch release/.nojekyll
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: release/wwwroot
+          path: release
 
   deploy:
     environment:
