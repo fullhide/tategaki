@@ -208,7 +208,25 @@ namespace TategakiPrint.Services
                                  .Cast<IDictionary<string, object>>()
                                  .ToList();
 
+                if (rows == null || !rows.Any())
+                {
+                    ErrorMessage = $"シート「{SelectedSheetName}」のA3セル以降にデータが見つかりませんでした。\nファイルの内容およびフォーマットをご確認ください。";
+                    return;
+                }
+
+                var firstRowKeys = rows.First().Keys.Where(k => k != null).Select(k => k.Trim()).ToList();
+                bool hasNameHeader = firstRowKeys.Any(k => k.Equals("名前", StringComparison.OrdinalIgnoreCase)
+                    || k.Equals("氏名", StringComparison.OrdinalIgnoreCase)
+                    || k.Equals("芳名", StringComparison.OrdinalIgnoreCase)
+                    || k.Equals("Name", StringComparison.OrdinalIgnoreCase));
+                bool hasAmountHeader = firstRowKeys.Any(k => k.Equals("合計金額", StringComparison.OrdinalIgnoreCase)
+                    || k.Equals("金額", StringComparison.OrdinalIgnoreCase)
+                    || k.Equals("寄付額", StringComparison.OrdinalIgnoreCase)
+                    || k.Equals("Amount", StringComparison.OrdinalIgnoreCase));
+
                 var validItems = new List<DonationMoneyItem>();
+                int skippedEmptyNameCount = 0;
+                int skippedInvalidAmountCount = 0;
 
                 for (int i = 0; i < rows.Count; i++)
                 {
@@ -223,16 +241,25 @@ namespace TategakiPrint.Services
 
                     string cleanedAmount = amountStr.Replace(",", "").Replace("￥", "").Replace("円", "").Trim();
 
-                    if (decimal.TryParse(cleanedAmount, out decimal amount) && amount > 0 && !string.IsNullOrWhiteSpace(name))
+                    if (string.IsNullOrWhiteSpace(name))
                     {
-                        validItems.Add(new DonationMoneyItem
-                        {
-                            Name = name.Trim(),
-                            Kana = kana.Trim(),
-                            Amount = amount,
-                            SortKey1 = k1.Trim()
-                        });
+                        skippedEmptyNameCount++;
+                        continue;
                     }
+
+                    if (!decimal.TryParse(cleanedAmount, out decimal amount) || amount <= 0)
+                    {
+                        skippedInvalidAmountCount++;
+                        continue;
+                    }
+
+                    validItems.Add(new DonationMoneyItem
+                    {
+                        Name = name.Trim(),
+                        Kana = kana.Trim(),
+                        Amount = amount,
+                        SortKey1 = k1.Trim()
+                    });
                 }
 
                 if (validItems.Any())
@@ -246,12 +273,19 @@ namespace TategakiPrint.Services
                 }
                 else
                 {
-                    ErrorMessage = $"シート「{SelectedSheetName}」から有効なデータを取り込めませんでした。";
+                    var headerHint = (!hasNameHeader || !hasAmountHeader)
+                        ? "\n（「名前」または「金額」の列が見つかりません。正しいシートを選択してください）"
+                        : string.Empty;
+
+                    ErrorMessage = $"シート「{SelectedSheetName}」から有効な寄付金データを取り込めませんでした。\n"
+                        + $"（読み取り行数: {rows.Count}件 / 名前空欄: {skippedEmptyNameCount}件 / 金額不正: {skippedInvalidAmountCount}件）"
+                        + headerHint
+                        + "\nA3セルからの列配置が正しいかご確認ください。";
                 }
             }
             catch (Exception ex)
             {
-                ErrorMessage = $"データ抽出エラー:\n{ex.Message}";
+                ErrorMessage = $"Excelデータの抽出中にエラーが発生しました。\n詳細:\n{ex.Message}";
             }
             finally
             {

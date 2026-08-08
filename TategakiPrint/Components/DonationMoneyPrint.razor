@@ -222,78 +222,94 @@
     }
 </div>
 
-<div class="print-container bg-white mx-auto shadow-sm" style="@DynamicCssVariables">
-    @for (int pIdx = 0; pIdx < PagedPages.Count; pIdx++)
-    {
-        var pageIndex = pIdx;
-        var pageItems = PagedPages[pageIndex];
+@if (State.IsLoading)
+{
+    <div class="text-center my-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-2">データを処理中...</p>
+    </div>
+}
+else if (State.Items == null || !State.Items.Any())
+{
+    <div class="alert alert-warning text-center my-5">
+        表示できる寄付金データがありません。上記の「Excelファイル選択」からファイルを読み込んでください。
+    </div>
+}
+else
+{
+    <div class="print-container bg-white mx-auto shadow-sm" style="@DynamicCssVariables">
+        @for (int pIdx = 0; pIdx < PagedPages.Count; pIdx++)
+        {
+            var pageIndex = pIdx;
+            var pageItems = PagedPages[pageIndex];
 
-        <div class="print-page">
-            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3 no-print">
-                <span class="badge bg-secondary fs-6">ページ @(pageIndex + 1) / @PagedPages.Count（件数: @pageItems.Count(i => !i.IsSpacer) 件）</span>
-            </div>
+            <div class="print-page">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3 no-print">
+                    <span class="badge bg-secondary fs-6">ページ @(pageIndex + 1) / @PagedPages.Count（件数: @pageItems.Count(i => !i.IsSpacer) 件）</span>
+                </div>
 
-            <div class="honochou-grid">
-                @for (int iIdx = 0; iIdx < pageItems.Count; iIdx++)
-                {
-                    var printable = pageItems[iIdx];
-                    bool isSelected = (SelectedItemId == printable.Id);
-
-                    @if (printable.IsSpacer)
+                <div class="honochou-grid">
+                    @for (int iIdx = 0; iIdx < pageItems.Count; iIdx++)
                     {
-                        <div class="honochou-card is-spacer @(isSelected ? "is-selected" : "")" 
-                             @onclick="() => SelectItem(printable.Id)"
-                             title="クリックしてこの空行を選択できます">
-                            <div class="item-selector-header no-print">
-                                <input type="radio" 
-                                       name="entry-selection" 
-                                       checked="@isSelected" 
-                                       @onchange="() => SelectItem(printable.Id)" 
-                                       @onclick:stopPropagation="true" />
+                        var printable = pageItems[iIdx];
+                        bool isSelected = (SelectedItemId == printable.Id);
+
+                        @if (printable.IsSpacer)
+                        {
+                            <div class="honochou-card is-spacer @(isSelected ? "is-selected" : "")" 
+                                 @onclick="() => SelectItem(printable.Id)"
+                                 title="クリックしてこの空行を選択できます">
+                                <div class="item-selector-header no-print">
+                                    <input type="radio" 
+                                           name="entry-selection" 
+                                           checked="@isSelected" 
+                                           @onchange="() => SelectItem(printable.Id)" 
+                                           @onclick:stopPropagation="true" />
+                                </div>
+                                <div class="spacer-label no-print">
+                                    <small class="text-muted" style="writing-mode: vertical-rl; font-size: 10px;">[区切り]</small>
+                                </div>
                             </div>
-                            <div class="spacer-label no-print">
-                                <small class="text-muted" style="writing-mode: vertical-rl; font-size: 10px;">[区切り]</small>
+                        }
+                        else if (printable.Item != null)
+                        {
+                            var item = printable.Item;
+                            bool isMulti = IsMultiLine(item.Name);
+
+                            <div class="honochou-card @(isMulti ? "is-multi-line" : "is-single-line") @(isSelected ? "is-selected" : "")" @onclick="() => SelectItem(printable.Id)">
+                                <div class="item-selector-header no-print">
+                                    <input type="radio" 
+                                           name="entry-selection" 
+                                           checked="@isSelected" 
+                                           @onchange="() => SelectItem(printable.Id)" 
+                                           @onclick:stopPropagation="true" />
+                                </div>
+
+                                <div class="grid-name-section">
+                                    <div class="vertical-text">
+                                        @((MarkupString)FormatVerticalName(item.Name))
+                                    </div>
+                                </div>
+
+                                <div class="grid-kin-section">
+                                    <div class="vertical-text-single">
+                                        金
+                                    </div>
+                                </div>
+
+                                <div class="grid-amount-section">
+                                    <div class="vertical-text-single">
+                                        @FormatAmountToKanji(item.Amount)円
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        }
                     }
-                    else if (printable.Item != null)
-                    {
-                        var item = printable.Item;
-                        bool isMulti = IsMultiLine(item.Name);
-
-                        <div class="honochou-card @(isMulti ? "is-multi-line" : "is-single-line") @(isSelected ? "is-selected" : "")" @onclick="() => SelectItem(printable.Id)">
-                            <div class="item-selector-header no-print">
-                                <input type="radio" 
-                                       name="entry-selection" 
-                                       checked="@isSelected" 
-                                       @onchange="() => SelectItem(printable.Id)" 
-                                       @onclick:stopPropagation="true" />
-                            </div>
-
-                            <div class="grid-name-section">
-                                <div class="vertical-text">
-                                    @((MarkupString)FormatVerticalName(item.Name))
-                                </div>
-                            </div>
-
-                            <div class="grid-kin-section">
-                                <div class="vertical-text-single">
-                                    金
-                                </div>
-                            </div>
-
-                            <div class="grid-amount-section">
-                                <div class="vertical-text-single">
-                                    @FormatAmountToKanji(item.Amount)円
-                                </div>
-                            </div>
-                        </div>
-                    }
-                }
+                </div>
             </div>
-        </div>
-    }
-</div>
+        }
+    </div>
+}
 
 <style>
     /* ドロップゾーン（DonationMoneyDataEdit と統一） */
