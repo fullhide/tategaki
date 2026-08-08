@@ -1,19 +1,22 @@
 # tategaki
 
-Blazor WebAssembly アプリケーションで、寄付金一覧と寄付品一覧のデータ入力・編集・縦書き印刷を提供します。
+tategaki は、寄付金・寄付品の一覧を Excel から取り込み、編集・印刷用レイアウトに整えて利用できる Blazor WebAssembly アプリケーションです。
 
-## 命名ルール
+## このプロジェクトについて
+- 寄付金のデータを確認しながら印刷用の縦書きレイアウトに整えられます
+- 寄付品のデータも同様に印刷向けに整理できます
+- ブラウザ上で操作でき、印刷用設定の保存・読み込みにも対応しています
 
-同じドメイン内で意味が異なる概念は、名前だけで区別できるように統一します。
+## ドキュメント
+- [spec.md](spec.md): 機能要件と仕様の概要
+- [AI_CONTEXT.md](AI_CONTEXT.md): 実装コンテキストと開発メモ
+- [RELEASE_NOTES.md](RELEASE_NOTES.md): ユーザー向けの変更点一覧
 
-- 寄付金系は `DonationMoney` で統一する
-  - 例: `DonationMoneyState`, `DonationMoneyItem`, `DonationMoneyHome`
-- 寄付品系は `DonationGoods` で統一する
-  - 例: `DonationGoodsState`, `DonationGoodsItem`, `DonationGoodsHome`
-- 画面・コンポーネント・モデル・サービスは、役割が分かる名前を使う
-- ファイル名も対応する概念が伝わるように命名する
+## 開発環境
+- .NET 10
+- Blazor WebAssembly
+- C# / Razor Components
+- MiniExcel
 
-## 開発メモ
-
-- 変更後は `dotnet build tategaki.slnx` でビルド確認を行う
-- 既存機能に影響する修正では、Excel 解析ロジックと印刷レイアウトの挙動を重点的に確認する
+## ライセンス
+このプロジェクトは MIT License のもとで提供されています。

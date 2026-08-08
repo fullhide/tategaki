@@ -40,3 +40,15 @@
 ## 5. 現状の注意点
 - 寄付品の編集画面はまだ未実装
 - Excel の入力フォーマット変更に対しては追加対応が必要な場合がある
+
+## 6. Markdown ドキュメントの役割
+- [README.md](README.md): プロジェクト概要、開発の入り口、命名ルールをまとめた概要資料
+- [spec.md](spec.md): アプリの機能要件と制約を整理した仕様書
+- [AI_CONTEXT.md](AI_CONTEXT.md): 実装コンテキストや開発ルールをまとめた開発メモ
+- [RELEASE_NOTES.md](RELEASE_NOTES.md): ユーザー向けの変更点・改善内容をまとめた告知用ノート
+
+## 7. ドキュメント更新方針
+- 機能要件や仕様が変わったときは [spec.md](spec.md) を更新する
+- 実装方針やファイル構成が変わったときは [AI_CONTEXT.md](AI_CONTEXT.md) を更新する
+- ユーザーに見せる変更点があるときは [RELEASE_NOTES.md](RELEASE_NOTES.md) を更新する
+- プロジェクトの基本情報や命名ルールを追加するときは [README.md](README.md) を更新する
