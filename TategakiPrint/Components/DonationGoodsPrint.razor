@@ -1057,7 +1057,8 @@ else
                             .Where(count => count > 0)
                             .ToList();
                     }
-                    await SaveSettingsAsync();
+                    var importJson = JsonSerializer.Serialize(Settings);
+                    await JS.InvokeVoidAsync("localStorage.setItem", LocalStorageKey, importJson);
                     ResetPages();
                     StateHasChanged();
                 }
