@@ -203,7 +203,7 @@ namespace TategakiPrint.Services
                 var json = await js.InvokeAsync<string>("localStorage.getItem", LocalStorageKey);
                 if (!string.IsNullOrWhiteSpace(json))
                 {
-                    var loaded = JsonSerializer.Deserialize<PrintSettings>(json);
+                    var loaded = JsonSerializer.Deserialize<DonationMoneyPrintSettings>(json);
                     return loaded?.LastSelectedSheetName;
                 }
             }
@@ -216,9 +216,9 @@ namespace TategakiPrint.Services
             try
             {
                 var json = await js.InvokeAsync<string>("localStorage.getItem", LocalStorageKey);
-                PrintSettings settings = !string.IsNullOrWhiteSpace(json) 
-                    ? JsonSerializer.Deserialize<PrintSettings>(json) ?? new PrintSettings() 
-                    : new PrintSettings();
+                DonationMoneyPrintSettings settings = !string.IsNullOrWhiteSpace(json) 
+                    ? JsonSerializer.Deserialize<DonationMoneyPrintSettings>(json) ?? new DonationMoneyPrintSettings() 
+                    : new DonationMoneyPrintSettings();
 
                 settings.LastSelectedSheetName = sheetName;
                 var updatedJson = JsonSerializer.Serialize(settings);

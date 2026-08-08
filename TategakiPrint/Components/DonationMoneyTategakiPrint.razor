@@ -626,7 +626,7 @@
         public bool IsSpacer { get; set; }
     }
 
-    private PrintSettings Settings { get; set; } = new PrintSettings
+    private DonationMoneyPrintSettings Settings { get; set; } = new DonationMoneyPrintSettings
     {
         SelectedFont = DefaultFont
     };
@@ -841,7 +841,7 @@
             var json = await JS.InvokeAsync<string>("localStorage.getItem", LocalStorageKey);
             if (!string.IsNullOrWhiteSpace(json))
             {
-                var loaded = JsonSerializer.Deserialize<PrintSettings>(json);
+                var loaded = JsonSerializer.Deserialize<DonationMoneyPrintSettings>(json);
                 if (loaded != null)
                 {
                     Settings = loaded;
@@ -868,7 +868,7 @@
 
     private async Task ResetSettingsToDefaultAsync()
     {
-        Settings = new PrintSettings { SelectedFont = DefaultFont };
+        Settings = new DonationMoneyPrintSettings { SelectedFont = DefaultFont };
         await JS.InvokeVoidAsync("localStorage.removeItem", LocalStorageKey);
         ResetPages();
     }
@@ -904,7 +904,7 @@
                 using var reader = new System.IO.StreamReader(stream);
                 var json = await reader.ReadToEndAsync();
 
-                var loaded = JsonSerializer.Deserialize<PrintSettings>(json);
+                var loaded = JsonSerializer.Deserialize<DonationMoneyPrintSettings>(json);
                 if (loaded != null)
                 {
                     Settings = loaded;
