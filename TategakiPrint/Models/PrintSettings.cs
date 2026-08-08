@@ -28,5 +28,8 @@ public class PrintSettings
 
     public string LastSelectedSheetName{get;set;} = string.Empty;
 
-    public List<string> PageEntryPersistentKeys { get; set; } = new();
+    /// <summary>
+    /// 各ページのエントリ数を表す一覧
+    /// </summary>
+    public List<int> PageEntryCounts { get; set; } = new();
 }

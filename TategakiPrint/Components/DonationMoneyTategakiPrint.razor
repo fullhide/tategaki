@@ -859,7 +859,7 @@
     {
         try
         {
-            Settings.PageEntryPersistentKeys = GetCurrentPageEntryPersistentKeys();
+            Settings.PageEntryCounts = GetCurrentPageEntryCounts();
             var json = JsonSerializer.Serialize(Settings);
             await JS.InvokeVoidAsync("localStorage.setItem", LocalStorageKey, json);
         }
@@ -875,7 +875,7 @@
 
     private async Task ExportSettingsAsync()
     {
-        Settings.PageEntryPersistentKeys = GetCurrentPageEntryPersistentKeys();
+        Settings.PageEntryCounts = GetCurrentPageEntryCounts();
         var json = JsonSerializer.Serialize(Settings, new JsonSerializerOptions { WriteIndented = true });
         var fileName = $"寄付金縦書き設定_{DateTime.Now:yyyyMMdd_HHmmss}.json";
         
@@ -907,22 +907,20 @@
                 var loaded = JsonSerializer.Deserialize<PrintSettings>(json);
                 if (loaded != null)
                 {
-                    var currentKeys = GetCurrentPageEntryPersistentKeys();
                     Settings = loaded;
                     if (string.IsNullOrWhiteSpace(Settings.SelectedFont))
                     {
                         Settings.SelectedFont = DefaultFont;
                     }
 
-                    if (Settings.PageEntryPersistentKeys == null || !Settings.PageEntryPersistentKeys.Any())
+                    if (Settings.PageEntryCounts == null || !Settings.PageEntryCounts.Any())
                     {
-                        Settings.PageEntryPersistentKeys = currentKeys;
+                        Settings.PageEntryCounts = GetCurrentPageEntryCounts();
                     }
                     else
                     {
-                        Settings.PageEntryPersistentKeys = Settings.PageEntryPersistentKeys
-                            .Where(key => !string.IsNullOrWhiteSpace(key))
-                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                        Settings.PageEntryCounts = Settings.PageEntryCounts
+                            .Where(count => count > 0)
                             .ToList();
                     }
 
@@ -1038,12 +1036,11 @@
 
     #endregion
 
-    private List<string> GetCurrentPageEntryPersistentKeys()
+    private List<int> GetCurrentPageEntryCounts()
     {
         return PagedPages
-            .SelectMany(page => page)
-            .Where(entry => !entry.IsSpacer && !string.IsNullOrWhiteSpace(entry.PersistentKey))
-            .Select(entry => entry.PersistentKey)
+            .Select(page => page.Count(entry => !entry.IsSpacer))
+            .Where(count => count > 0)
             .ToList();
     }
 
@@ -1053,34 +1050,17 @@
         if (State.Items == null || !State.Items.Any()) return;
 
         var orderedItems = State.Items.ToList();
-        if (Settings.PageEntryPersistentKeys != null && Settings.PageEntryPersistentKeys.Any())
-        {
-            var orderedKeys = Settings.PageEntryPersistentKeys
-                .Where(key => !string.IsNullOrWhiteSpace(key))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
 
-            var keyedItems = orderedItems
-                .Where(item => orderedKeys.Contains($"{item.Id}", StringComparer.OrdinalIgnoreCase))
-                .OrderBy(item =>
-                {
-                    var index = orderedKeys.FindIndex(key => string.Equals(key, $"{item.Id}", StringComparison.OrdinalIgnoreCase));
-                    return index >= 0 ? index : int.MaxValue;
-                })
-                .ToList();
-
-            var remainingItems = orderedItems
-                .Where(item => !orderedKeys.Contains($"{item.Id}", StringComparer.OrdinalIgnoreCase))
-                .ToList();
-
-            orderedItems = keyedItems.Concat(remainingItems).ToList();
-        }
+        var pageEntryCounts = (Settings.PageEntryCounts ?? new List<int>())
+            .Where(count => count > 0)
+            .ToList();
 
         var currentPage = new List<PrintableEntry>();
         double currentWidthSum = 0;
         double effectiveMax = Settings.MaxPageWidthUnits - 0.05;
 
         decimal? previousAmount = null;
+        int pageEntryIndex = 0;
 
         foreach (var item in orderedItems)
         {
@@ -1107,6 +1087,19 @@
             previousAmount = item.Amount;
 
             double itemWidth = IsMultiLine(item.Name) ? Settings.MultiLineWidth : Settings.SingleLineWidth;
+            bool shouldBreakPage = currentPage.Any() && pageEntryCounts.Any() && pageEntryIndex >= pageEntryCounts[0];
+
+            if (shouldBreakPage)
+            {
+                PagedPages.Add(currentPage);
+                currentPage = new List<PrintableEntry>();
+                currentWidthSum = 0;
+                pageEntryIndex = 0;
+                if (pageEntryCounts.Count > 1)
+                {
+                    pageEntryCounts.RemoveAt(0);
+                }
+            }
 
             if (currentWidthSum + itemWidth > effectiveMax && currentPage.Any())
             {
@@ -1116,6 +1109,7 @@
             }
 
             currentPage.Add(new PrintableEntry { Id = $"entry-{item.Id}", PersistentKey = $"{item.Id}", Item = item, IsSpacer = false });
+            pageEntryIndex++;
             currentWidthSum += itemWidth;
         }
 

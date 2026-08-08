@@ -731,12 +731,11 @@ else
         return $"flex: 0 0 {totalWidth}px;";
     }
 
-    private List<string> GetCurrentPageEntryPersistentKeys()
+    private List<int> GetCurrentPageEntryCounts()
     {
         return PagedPages
-            .SelectMany(page => page)
-            .Where(entry => !entry.IsSpacer && !string.IsNullOrWhiteSpace(entry.PersistentKey))
-            .Select(entry => entry.PersistentKey)
+            .Select(page => page.Count(entry => !entry.IsSpacer))
+            .Where(count => count > 0)
             .ToList();
     }
 
@@ -760,39 +759,34 @@ else
         GroupedItems = groups;
 
         var orderedGroups = groups.ToList();
-        if (Settings.PageEntryPersistentKeys != null && Settings.PageEntryPersistentKeys.Any())
-        {
-            var orderedKeys = Settings.PageEntryPersistentKeys
-                .Where(key => !string.IsNullOrWhiteSpace(key))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
 
-            var keyedGroups = orderedGroups
-                .Where(group => orderedKeys.Contains($"{group.Items.FirstOrDefault()?.Id ?? string.Empty}", StringComparer.OrdinalIgnoreCase))
-                .OrderBy(group =>
-                {
-                    var key = $"{group.Items.FirstOrDefault()?.Id ?? string.Empty}";
-                    var index = orderedKeys.FindIndex(itemKey => string.Equals(itemKey, key, StringComparison.OrdinalIgnoreCase));
-                    return index >= 0 ? index : int.MaxValue;
-                })
-                .ToList();
-
-            var remainingGroups = orderedGroups
-                .Where(group => !orderedKeys.Contains($"{group.Items.FirstOrDefault()?.Id ?? string.Empty}", StringComparer.OrdinalIgnoreCase))
-                .ToList();
-
-            orderedGroups = keyedGroups.Concat(remainingGroups).ToList();
-        }
+        var pageEntryCounts = (Settings.PageEntryCounts ?? new List<int>())
+            .Where(count => count > 0)
+            .ToList();
 
         var currentPage = new List<PrintableGoodsEntry>();
         double currentWidthSum = 0;
         double effectiveMax = Settings.MaxPageWidthUnits - 0.05;
+        int pageEntryIndex = 0;
 
         foreach (var group in orderedGroups)
         {
             double baseWidth = IsMultiLine(group) ? Settings.MultiLineWidth : Settings.SingleLineWidth;
             double extraWidth = (group.Items.Count > 1) ? (group.Items.Count - 1) * 0.7 : 0;
             double totalWidth = baseWidth + extraWidth;
+            bool shouldBreakPage = currentPage.Any() && pageEntryCounts.Any() && pageEntryIndex >= pageEntryCounts[0];
+
+            if (shouldBreakPage)
+            {
+                PagedPages.Add(currentPage);
+                currentPage = new List<PrintableGoodsEntry>();
+                currentWidthSum = 0;
+                pageEntryIndex = 0;
+                if (pageEntryCounts.Count > 1)
+                {
+                    pageEntryCounts.RemoveAt(0);
+                }
+            }
 
             if (currentWidthSum + totalWidth > effectiveMax && currentPage.Any())
             {
@@ -810,6 +804,7 @@ else
             });
 
             currentWidthSum += totalWidth;
+            pageEntryIndex++;
         }
 
         if (currentPage.Any())
@@ -1002,7 +997,7 @@ else
     {
         try
         {
-            Settings.PageEntryPersistentKeys = GetCurrentPageEntryPersistentKeys();
+            Settings.PageEntryCounts = GetCurrentPageEntryCounts();
             var json = JsonSerializer.Serialize(Settings);
             await JS.InvokeVoidAsync("localStorage.setItem", LocalStorageKey, json);
         }
@@ -1018,7 +1013,7 @@ else
 
     private async Task ExportSettingsAsync()
     {
-        Settings.PageEntryPersistentKeys = GetCurrentPageEntryPersistentKeys();
+        Settings.PageEntryCounts = GetCurrentPageEntryCounts();
         var json = JsonSerializer.Serialize(Settings, new JsonSerializerOptions { WriteIndented = true });
         var fileName = $"寄付品縦書き設定_{DateTime.Now:yyyyMMdd_HHmmss}.json";
         
@@ -1050,18 +1045,16 @@ else
                 var loaded = JsonSerializer.Deserialize<DonationGoodsPrintSettings>(json);
                 if (loaded != null)
                 {
-                    var currentKeys = GetCurrentPageEntryPersistentKeys();
                     Settings = loaded;
                     if (string.IsNullOrWhiteSpace(Settings.SelectedFont)) Settings.SelectedFont = DefaultFont;
-                    if (Settings.PageEntryPersistentKeys == null || !Settings.PageEntryPersistentKeys.Any())
+                    if (Settings.PageEntryCounts == null || !Settings.PageEntryCounts.Any())
                     {
-                        Settings.PageEntryPersistentKeys = currentKeys;
+                        Settings.PageEntryCounts = GetCurrentPageEntryCounts();
                     }
                     else
                     {
-                        Settings.PageEntryPersistentKeys = Settings.PageEntryPersistentKeys
-                            .Where(key => !string.IsNullOrWhiteSpace(key))
-                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                        Settings.PageEntryCounts = Settings.PageEntryCounts
+                            .Where(count => count > 0)
                             .ToList();
                     }
                     await SaveSettingsAsync();
