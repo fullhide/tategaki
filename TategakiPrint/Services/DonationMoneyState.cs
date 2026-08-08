@@ -26,6 +26,10 @@ namespace TategakiPrint.Services
         public string SelectedSheetName { get; set; } = string.Empty;
         public string? ErrorMessage { get; set; }
         public bool IsLoading { get; set; }
+        public string LastLoadedWorkbookName { get; private set; } = string.Empty;
+        public string LastLoadedSheetName { get; private set; } = string.Empty;
+        public DateTime? LastLoadedAt { get; private set; }
+        private string CurrentWorkbookName { get; set; } = string.Empty;
 
         public event Action? OnChange;
 
@@ -53,12 +57,13 @@ namespace TategakiPrint.Services
         }
 
         // --- Excelファイルセット・解析ロジック ---
-        public async Task SetFileAsync(Stream stream, IJSRuntime js)
+        public async Task SetFileAsync(Stream stream, IJSRuntime js, string workbookName = "")
         {
             IsLoading = true;
             ErrorMessage = null;
             SheetNames.Clear();
             FileBytes = null;
+            CurrentWorkbookName = workbookName;
             NotifyStateChanged();
 
             try
@@ -159,6 +164,9 @@ namespace TategakiPrint.Services
                     Items = validItems;
                     SortItems();
                     await SaveLastSelectedSheetNameAsync(js, SelectedSheetName);
+                    LastLoadedWorkbookName = CurrentWorkbookName;
+                    LastLoadedSheetName = SelectedSheetName;
+                    LastLoadedAt = DateTime.Now;
                 }
                 else
                 {

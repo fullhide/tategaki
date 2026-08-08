@@ -7,17 +7,7 @@
 
 <!-- 上部固定操作パネル（sticky-top-panel） -->
 <div class="card p-3 mb-4 shadow-sm no-print bg-light sticky-top-panel">
-    <div class="d-flex justify-content-between align-items-center">
-        <!-- 左側：戻るボタン ＋ タイトルエリア -->
-        <div class="d-flex align-items-center gap-3">
-            <div>
-                <h4 class="m-0">縦書きプレビュー・印刷</h4>
-                <small class="text-muted">
-                    全 @State.Items.Count 件（全 @PagedPages.Count ページ）/ 短冊のラジオボタンを選択してページ移動を行えます
-                </small>
-            </div>
-        </div>
-
+    <div class="d-flex justify-content-end align-items-center">
         <!-- 右側：設定・印刷・操作ボタン群 -->
         <div class="d-flex gap-2 align-items-center">
             <!-- 個別空行の非表示ボタン -->
@@ -73,11 +63,11 @@
     <!-- Excelファイル取り込みパネル（DonationMoneyDataEditと共通状態を参照） -->
     @if (showExcelImport)
     {
-        <div class="card p-3 mt-3 border-primary bg-white shadow-sm">
+        <div class="card p-3 mt-3 border-primary bg-white shadow-sm mx-auto" style="max-width: 1120px;">
             <h5 class="mb-2">Excelファイルの取り込み</h5>
             
             <div class="mb-3">
-                <div class="drop-zone p-3 text-center rounded border border-2 border-dashed position-relative bg-light">
+                <div class="drop-zone p-2 text-center rounded border border-2 border-dashed position-relative bg-light">
                     <div class="drop-zone-content">
                         <span class="fs-4 text-primary me-2">📁</span>
                         <span class="fw-bold text-secondary">
@@ -90,7 +80,7 @@
 
             @if (State.SheetNames.Any())
             {
-                <div class="row g-2 align-items-center mb-2">
+                <div class="row g-2 align-items-center mb-0">
                     <div class="col-auto">
                         <label class="col-form-label fw-bold">シート選択:</label>
                     </div>
@@ -712,7 +702,7 @@
     private async Task OnExcelFileSelected(InputFileChangeEventArgs e)
     {
         using var stream = e.File.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
-        await State.SetFileAsync(stream, JS);
+        await State.SetFileAsync(stream, JS, e.File.Name);
     }
 
     private async Task OnExcelSheetChangedAsync(ChangeEventArgs e)

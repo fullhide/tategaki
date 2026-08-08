@@ -7,7 +7,22 @@
 <PageTitle>寄付金一覧 縦書き印刷</PageTitle>
 
 <div class="container-fluid py-3">
-    <h2 class="mb-4">寄付金一覧 縦書き印刷</h2>
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-4">
+        <h2 class="m-0">寄付金一覧 縦書き印刷</h2>
+        @if (!string.IsNullOrWhiteSpace(State.LastLoadedWorkbookName) &&
+             !string.IsNullOrWhiteSpace(State.LastLoadedSheetName) &&
+             State.LastLoadedAt.HasValue)
+        {
+            <div class="small text-secondary">
+                <span class="fw-semibold text-muted me-2">最終読込情報</span>
+                <span class="fw-semibold">@State.LastLoadedWorkbookName</span>
+                <span class="mx-2">|</span>
+                <span>シート: @State.LastLoadedSheetName</span>
+                <span class="mx-2">|</span>
+                <span>読込日時: @State.LastLoadedAt.Value.ToString("yyyy/MM/dd HH:mm:ss")</span>
+            </div>
+        }
+    </div>
 
     <!-- タブ風ナビゲーション（印刷 / 編集 切り替え） -->
     <div class="d-flex justify-content-center mb-4">
