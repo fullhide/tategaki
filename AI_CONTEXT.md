@@ -11,7 +11,7 @@
 ### 寄付金フロー
 - [TategakiPrint/Pages/DonationMoneyHome.razor](TategakiPrint/Pages/DonationMoneyHome.razor): 寄付金画面の入口
 - [TategakiPrint/Components/DonationMoneyDataEdit.razor](TategakiPrint/Components/DonationMoneyDataEdit.razor): Excel 取り込みと表編集
-- [TategakiPrint/Components/DonationMoneyTategakiPrint.razor](TategakiPrint/Components/DonationMoneyTategakiPrint.razor): 印刷プレビューとレイアウト制御
+- [TategakiPrint/Components/DonationMoneyPrint.razor](TategakiPrint/Components/DonationMoneyPrint.razor): 印刷プレビューとレイアウト制御
 - [TategakiPrint/Services/DonationMoneyState.cs](TategakiPrint/Services/DonationMoneyState.cs): データ読み込み・ソート・画面状態管理
 - [TategakiPrint/Models/DonationMoneyItem.cs](TategakiPrint/Models/DonationMoneyItem.cs): 寄付金データモデル
 - [TategakiPrint/Models/DonationMoneyPrintSettings.cs](TategakiPrint/Models/DonationMoneyPrintSettings.cs): 寄付金用印刷設定モデル（`DonationMoneyPrintSettings`）
