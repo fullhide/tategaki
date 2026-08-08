@@ -966,7 +966,7 @@ else
     private async Task ExportSettingsAsync()
     {
         var json = JsonSerializer.Serialize(Settings, new JsonSerializerOptions { WriteIndented = true });
-        var fileName = $"寄付品縦書き設定_{DateTime.Now:yyyyMMdd}.json";
+        var fileName = $"寄付品縦書き設定_{DateTime.Now:yyyyMMdd_HHmmss}.json";
         
         var bytes = System.Text.Encoding.UTF8.GetBytes(json);
         var base64 = Convert.ToBase64String(bytes);
