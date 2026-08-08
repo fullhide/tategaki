@@ -21,10 +21,4 @@ public class DonationMoneyItem
 
     [ExcelColumn(Index = 14)]
     public string SortKey1 { get; set; } = string.Empty;
-
-    [ExcelColumn(Index = 15)]
-    public string SortKey2 { get; set; } = string.Empty;
-
-    [ExcelColumn(Index = 16)]
-    public string SortKey3 { get; set; } = string.Empty;
 }

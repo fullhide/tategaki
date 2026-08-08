@@ -29,6 +29,11 @@ public class DonationMoneyPrintSettings
     public string LastSelectedSheetName{get;set;} = string.Empty;
 
     /// <summary>
+    /// 寄付金一覧のソート適用順
+    /// </summary>
+    public List<string> SortOrder { get; set; } = new() { "amount", "kana", "customKey", "name" };
+
+    /// <summary>
     /// 各ページのエントリ数を表す一覧
     /// </summary>
     public List<int> PageEntryCounts { get; set; } = new();

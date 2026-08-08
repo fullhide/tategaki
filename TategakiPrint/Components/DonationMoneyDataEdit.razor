@@ -11,7 +11,7 @@
         <!-- 左側：タイトルエリア -->
         <div>
             <h4 class="m-0">データ確認・編集</h4>
-            <small class="text-muted">全 @State.Items.Count 件（金額降順 ＞ かな ＞ ソート1〜3順で整列中）</small>
+            <small class="text-muted">全 @State.Items.Count 件（@GetSortOrderSummary() で整列中）</small>
         </div>
 
         <!-- 右側：アクションボタン群 -->
@@ -19,11 +19,41 @@
             <button type="button" class="btn btn-outline-primary" @onclick="ToggleImportPanel">
                 📁 Excel取り込み @(showImportPanel ? "▲" : "▼")
             </button>
+            <button type="button" class="btn btn-outline-dark" @onclick="ToggleSortConfigPanel">
+                ↕ 並べ替え設定 @(showSortConfigPanel ? "▲" : "▼")
+            </button>
             <button type="button" class="btn btn-outline-secondary" @onclick="ReSort">
-                🔄 既定順でソート再実行
+                🔄 指定順でソート再実行
             </button>
         </div>
     </div>
+
+    @if (showSortConfigPanel)
+    {
+        <div class="card border-secondary bg-white mb-3">
+            <div class="card-header py-2 px-3 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">並べ替え設定</span>
+                <small class="text-muted">優先度が高い順に上から適用</small>
+            </div>
+            <div class="card-body p-2">
+                @for (int i = 0; i < State.SortOrder.Count; i++)
+                {
+                    var index = i;
+                    var key = State.SortOrder[index];
+                    <div class="d-flex align-items-center gap-2 p-2 border rounded mb-2 bg-light">
+                        <div style="width: 120px;" class="fw-semibold text-secondary">第@(index + 1)キー</div>
+                        <div class="flex-grow-1">
+                            <div class="form-control form-control-sm bg-white">@GetSortLabel(key)</div>
+                        </div>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => MoveSortPriorityAsync(index, -1)" disabled="@(index == 0)">▲</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => MoveSortPriorityAsync(index, 1)" disabled="@(index == State.SortOrder.Count - 1)">▼</button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
 
     <!-- Excelファイル取り込み展開パネル -->
     @if (showImportPanel)
@@ -81,9 +111,7 @@
                     <th>名前 (B列)</th>
                     <th>かな (C列)</th>
                     <th style="width: 140px;">金額 (J列)</th>
-                    <th style="width: 120px;">ソート1(*)</th>
-                    <th style="width: 120px;">ソート2(**)</th>
-                    <th style="width: 120px;">ソート3(***)</th>
+                    <th style="width: 200px;">カスタムキー(*)</th>
                     <th style="width: 60px;"></th>
                 </tr>
             </thead>
@@ -105,12 +133,6 @@
                         </td>
                         <td>
                             <input type="text" class="form-control form-control-sm" @bind="item.SortKey1" />
-                        </td>
-                        <td>
-                            <input type="text" class="form-control form-control-sm" @bind="item.SortKey2" />
-                        </td>
-                        <td>
-                            <input type="text" class="form-control form-control-sm" @bind="item.SortKey3" />
                         </td>
                         <td class="text-center">
                             <button type="button" class="btn btn-outline-danger btn-sm border-0" @onclick="() => RemoveItem(index)" title="削除">
@@ -143,6 +165,15 @@
 
 @code {
     private bool showImportPanel = false;
+    private bool showSortConfigPanel = false;
+    private static readonly Dictionary<string, string> SortLabelMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [DonationMoneyState.SortByAmount] = "金額",
+        [DonationMoneyState.SortByKana] = "かな",
+        [DonationMoneyState.SortByCustomKey] = "カスタムキー(*)",
+        [DonationMoneyState.SortByName] = "名前"
+    };
+
     protected override void OnInitialized()
     {
         State.OnChange += OnStateChanged;
@@ -152,7 +183,16 @@
         {
             showImportPanel = true;
         }
-        State.SortItems();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await State.LoadSortOrderAsync(JS);
+            State.SortItems();
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     public void Dispose()
@@ -166,7 +206,29 @@
     }
 
     private void ToggleImportPanel() => showImportPanel = !showImportPanel;
+    private void ToggleSortConfigPanel() => showSortConfigPanel = !showSortConfigPanel;
     private void ReSort() => State.SortItems();
+
+    private string GetSortLabel(string sortKey)
+    {
+        return SortLabelMap.TryGetValue(sortKey, out var label) ? label : sortKey;
+    }
+
+    private string GetSortOrderSummary()
+    {
+        return string.Join(" > ", State.SortOrder.Select(GetSortLabel));
+    }
+
+    private async Task MoveSortPriorityAsync(int index, int direction)
+    {
+        var nextIndex = index + direction;
+        if (index < 0 || index >= State.SortOrder.Count) return;
+        if (nextIndex < 0 || nextIndex >= State.SortOrder.Count) return;
+
+        var updatedOrder = State.SortOrder.ToList();
+        (updatedOrder[index], updatedOrder[nextIndex]) = (updatedOrder[nextIndex], updatedOrder[index]);
+        await State.SetSortOrderAsync(JS, updatedOrder);
+    }
 
     private void RemoveItem(int index)
     {
@@ -185,7 +247,7 @@
     private async Task OnFileSelected(InputFileChangeEventArgs e)
     {
         using var stream = e.File.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
-        await State.SetFileAsync(stream, JS);
+        await State.SetFileAsync(stream, JS, e.File.Name);
     }
 
     private async Task OnSheetChangedAsync(ChangeEventArgs e)

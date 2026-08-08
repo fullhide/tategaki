@@ -840,6 +840,9 @@
                     {
                         Settings.SelectedFont = DefaultFont;
                     }
+
+                    await State.SetSortOrderAsync(JS, Settings.SortOrder, applySort: true);
+                    Settings.SortOrder = State.SortOrder.ToList();
                 }
             }
         }
@@ -850,6 +853,7 @@
     {
         try
         {
+            Settings.SortOrder = State.SortOrder.ToList();
             Settings.PageEntryCounts = GetCurrentPageEntryCounts();
             var json = JsonSerializer.Serialize(Settings);
             await JS.InvokeVoidAsync("localStorage.setItem", LocalStorageKey, json);
@@ -860,12 +864,14 @@
     private async Task ResetSettingsToDefaultAsync()
     {
         Settings = new DonationMoneyPrintSettings { SelectedFont = DefaultFont };
+        await State.SetSortOrderAsync(JS, Settings.SortOrder, applySort: true);
         await JS.InvokeVoidAsync("localStorage.removeItem", LocalStorageKey);
         ResetPages();
     }
 
     private async Task ExportSettingsAsync()
     {
+        Settings.SortOrder = State.SortOrder.ToList();
         Settings.PageEntryCounts = GetCurrentPageEntryCounts();
         var json = JsonSerializer.Serialize(Settings, new JsonSerializerOptions { WriteIndented = true });
         var fileName = $"寄付金縦書き設定_{DateTime.Now:yyyyMMdd_HHmmss}.json";
@@ -903,6 +909,9 @@
                     {
                         Settings.SelectedFont = DefaultFont;
                     }
+
+                    await State.SetSortOrderAsync(JS, Settings.SortOrder, applySort: true);
+                    Settings.SortOrder = State.SortOrder.ToList();
 
                     if (Settings.PageEntryCounts == null || !Settings.PageEntryCounts.Any())
                     {

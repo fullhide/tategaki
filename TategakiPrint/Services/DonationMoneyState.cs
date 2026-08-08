@@ -13,6 +13,18 @@ namespace TategakiPrint.Services
     public class DonationMoneyState
     {
         private const string LocalStorageKey = "TategakiPrint_DonationMoney_Settings";
+        public const string SortByAmount = "amount";
+        public const string SortByKana = "kana";
+        public const string SortByCustomKey = "customKey";
+        public const string SortByName = "name";
+        private static readonly List<string> DefaultSortOrder = new() { SortByAmount, SortByKana, SortByCustomKey, SortByName };
+        private static readonly HashSet<string> AllowedSortKeys = new(StringComparer.OrdinalIgnoreCase)
+        {
+            SortByAmount,
+            SortByKana,
+            SortByCustomKey,
+            SortByName
+        };
 
         // 既存のプロパティ
         public List<DonationMoneyItem> Items { get; set; } = new();
@@ -29,7 +41,9 @@ namespace TategakiPrint.Services
         public string LastLoadedWorkbookName { get; private set; } = string.Empty;
         public string LastLoadedSheetName { get; private set; } = string.Empty;
         public DateTime? LastLoadedAt { get; private set; }
+        public IReadOnlyList<string> SortOrder => _sortOrder;
         private string CurrentWorkbookName { get; set; } = string.Empty;
+        private List<string> _sortOrder = new(DefaultSortOrder);
 
         public event Action? OnChange;
 
@@ -45,15 +59,77 @@ namespace TategakiPrint.Services
 
         public void SortItems()
         {
-            // 既存のソート処理
-            Items = Items
-                .OrderByDescending(x => x.Amount)
-                .ThenBy(x => x.Kana)
-                .ThenBy(x => x.SortKey1)
-                .ThenBy(x => x.SortKey2)
-                .ThenBy(x => x.SortKey3)
-                .ToList();
+            IOrderedEnumerable<DonationMoneyItem>? ordered = null;
+
+            foreach (var sortKey in _sortOrder)
+            {
+                switch (sortKey)
+                {
+                    case SortByAmount:
+                        ordered = ordered == null
+                            ? Items.OrderByDescending(x => x.Amount)
+                            : ordered.ThenByDescending(x => x.Amount);
+                        break;
+                    case SortByKana:
+                        ordered = ordered == null
+                            ? Items.OrderBy(x => x.Kana)
+                            : ordered.ThenBy(x => x.Kana);
+                        break;
+                    case SortByCustomKey:
+                        ordered = ordered == null
+                            ? Items.OrderBy(x => x.SortKey1)
+                            : ordered.ThenBy(x => x.SortKey1);
+                        break;
+                    case SortByName:
+                        ordered = ordered == null
+                            ? Items.OrderBy(x => x.Name)
+                            : ordered.ThenBy(x => x.Name);
+                        break;
+                }
+            }
+
+            Items = (ordered ?? Items.OrderByDescending(x => x.Amount)).ToList();
             NotifyStateChanged();
+        }
+
+        public async Task LoadSortOrderAsync(IJSRuntime js)
+        {
+            try
+            {
+                var json = await js.InvokeAsync<string>("localStorage.getItem", LocalStorageKey);
+                if (!string.IsNullOrWhiteSpace(json))
+                {
+                    var loaded = JsonSerializer.Deserialize<DonationMoneyPrintSettings>(json);
+                    _sortOrder = NormalizeSortOrder(loaded?.SortOrder);
+                    return;
+                }
+            }
+            catch { }
+
+            _sortOrder = NormalizeSortOrder(null);
+        }
+
+        public async Task SetSortOrderAsync(IJSRuntime js, IEnumerable<string>? sortOrder, bool applySort = true)
+        {
+            _sortOrder = NormalizeSortOrder(sortOrder);
+
+            try
+            {
+                var json = await js.InvokeAsync<string>("localStorage.getItem", LocalStorageKey);
+                DonationMoneyPrintSettings settings = !string.IsNullOrWhiteSpace(json)
+                    ? JsonSerializer.Deserialize<DonationMoneyPrintSettings>(json) ?? new DonationMoneyPrintSettings()
+                    : new DonationMoneyPrintSettings();
+
+                settings.SortOrder = _sortOrder.ToList();
+                var updatedJson = JsonSerializer.Serialize(settings);
+                await js.InvokeVoidAsync("localStorage.setItem", LocalStorageKey, updatedJson);
+            }
+            catch { }
+
+            if (applySort)
+            {
+                SortItems();
+            }
         }
 
         // --- Excelファイルセット・解析ロジック ---
@@ -140,8 +216,6 @@ namespace TategakiPrint.Services
                     string amountStr = GetVal(row, 9, "合計金額", "金額", "寄付額", "Amount", "J");
 
                     string k1 = GetVal(row, 13, "*", "N");
-                    string k2 = GetVal(row, 15, "**", "P");
-                    string k3 = GetVal(row, 16, "***", "Q");
 
                     string cleanedAmount = amountStr.Replace(",", "").Replace("￥", "").Replace("円", "").Trim();
 
@@ -152,9 +226,7 @@ namespace TategakiPrint.Services
                             Name = name.Trim(),
                             Kana = kana.Trim(),
                             Amount = amount,
-                            SortKey1 = k1.Trim(),
-                            SortKey2 = k2.Trim(),
-                            SortKey3 = k3.Trim()
+                            SortKey1 = k1.Trim()
                         });
                     }
                 }
@@ -229,10 +301,38 @@ namespace TategakiPrint.Services
                     : new DonationMoneyPrintSettings();
 
                 settings.LastSelectedSheetName = sheetName;
+                settings.SortOrder = _sortOrder.ToList();
                 var updatedJson = JsonSerializer.Serialize(settings);
                 await js.InvokeVoidAsync("localStorage.setItem", LocalStorageKey, updatedJson);
             }
             catch { }
+        }
+
+        private static List<string> NormalizeSortOrder(IEnumerable<string>? source)
+        {
+            var normalized = new List<string>();
+
+            if (source != null)
+            {
+                foreach (var key in source)
+                {
+                    if (string.IsNullOrWhiteSpace(key)) continue;
+                    if (!AllowedSortKeys.Contains(key)) continue;
+                    if (normalized.Contains(key, StringComparer.OrdinalIgnoreCase)) continue;
+
+                    normalized.Add(key);
+                }
+            }
+
+            foreach (var defaultKey in DefaultSortOrder)
+            {
+                if (!normalized.Contains(defaultKey, StringComparer.OrdinalIgnoreCase))
+                {
+                    normalized.Add(defaultKey);
+                }
+            }
+
+            return normalized;
         }
 
         private void NotifyStateChanged() => OnChange?.Invoke();
