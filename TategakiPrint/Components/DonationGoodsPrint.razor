@@ -51,7 +51,10 @@
     @if (showExcelImport)
     {
         <div class="card p-3 mt-3 border-primary bg-white shadow-sm mx-auto" style="max-width: 1120px;">
-            <h5 class="mb-2">Excelファイルの取り込み</h5>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="m-0">Excelファイルの取り込み</h5>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => showExcelImport = false">閉じる</button>
+            </div>
             
             <div class="mb-3">
                 <div class="drop-zone p-2 text-center rounded border border-2 border-dashed position-relative bg-light">
@@ -98,6 +101,11 @@
     @if (showAdvancedSettings)
     {
         <div class="border-top pt-3 mt-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="m-0">詳細設定</h6>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => showAdvancedSettings = false">閉じる</button>
+            </div>
+
             <div class="row g-3 align-items-center mb-2">
                 <div class="col-md-3">
                     <label class="form-label font-weight-bold mb-1"><small>フォント種類</small></label>

@@ -30,10 +30,13 @@
 
     @if (showSortConfigPanel)
     {
-        <div class="card border-secondary bg-white mb-3">
+        <div class="card border-secondary bg-white mb-3 mx-auto" style="max-width: 1120px;">
             <div class="card-header py-2 px-3 d-flex justify-content-between align-items-center">
                 <span class="fw-semibold">並べ替え設定</span>
-                <small class="text-muted">優先度が高い順に上から適用</small>
+                <div class="d-flex align-items-center gap-2">
+                    <small class="text-muted">優先度が高い順に上から適用</small>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => showSortConfigPanel = false">閉じる</button>
+                </div>
             </div>
             <div class="card-body p-2">
                 @for (int i = 0; i < State.SortOrder.Count; i++)
@@ -59,7 +62,10 @@
     @if (showImportPanel)
     {
         <div class="card p-3 mt-3 border-primary bg-white shadow-sm mx-auto" style="max-width: 1120px;">
-            <h5 class="mb-2">Excelファイルの取り込み</h5>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="m-0">Excelファイルの取り込み</h5>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => showImportPanel = false">閉じる</button>
+            </div>
             
             <div class="mb-3">
                 <div class="drop-zone p-2 text-center rounded border border-2 border-dashed position-relative bg-light">
