@@ -759,11 +759,36 @@ else
 
         GroupedItems = groups;
 
+        var orderedGroups = groups.ToList();
+        if (Settings.PageEntryPersistentKeys != null && Settings.PageEntryPersistentKeys.Any())
+        {
+            var orderedKeys = Settings.PageEntryPersistentKeys
+                .Where(key => !string.IsNullOrWhiteSpace(key))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var keyedGroups = orderedGroups
+                .Where(group => orderedKeys.Contains($"{group.Items.FirstOrDefault()?.Id ?? string.Empty}", StringComparer.OrdinalIgnoreCase))
+                .OrderBy(group =>
+                {
+                    var key = $"{group.Items.FirstOrDefault()?.Id ?? string.Empty}";
+                    var index = orderedKeys.FindIndex(itemKey => string.Equals(itemKey, key, StringComparison.OrdinalIgnoreCase));
+                    return index >= 0 ? index : int.MaxValue;
+                })
+                .ToList();
+
+            var remainingGroups = orderedGroups
+                .Where(group => !orderedKeys.Contains($"{group.Items.FirstOrDefault()?.Id ?? string.Empty}", StringComparer.OrdinalIgnoreCase))
+                .ToList();
+
+            orderedGroups = keyedGroups.Concat(remainingGroups).ToList();
+        }
+
         var currentPage = new List<PrintableGoodsEntry>();
         double currentWidthSum = 0;
         double effectiveMax = Settings.MaxPageWidthUnits - 0.05;
 
-        foreach (var group in groups)
+        foreach (var group in orderedGroups)
         {
             double baseWidth = IsMultiLine(group) ? Settings.MultiLineWidth : Settings.SingleLineWidth;
             double extraWidth = (group.Items.Count > 1) ? (group.Items.Count - 1) * 0.7 : 0;
@@ -1028,13 +1053,16 @@ else
                     var currentKeys = GetCurrentPageEntryPersistentKeys();
                     Settings = loaded;
                     if (string.IsNullOrWhiteSpace(Settings.SelectedFont)) Settings.SelectedFont = DefaultFont;
-                    if (currentKeys.Any())
+                    if (Settings.PageEntryPersistentKeys == null || !Settings.PageEntryPersistentKeys.Any())
                     {
                         Settings.PageEntryPersistentKeys = currentKeys;
                     }
-                    else if (Settings.PageEntryPersistentKeys == null || !Settings.PageEntryPersistentKeys.Any())
+                    else
                     {
-                        Settings.PageEntryPersistentKeys = new List<string>();
+                        Settings.PageEntryPersistentKeys = Settings.PageEntryPersistentKeys
+                            .Where(key => !string.IsNullOrWhiteSpace(key))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList();
                     }
                     await SaveSettingsAsync();
                     ResetPages();

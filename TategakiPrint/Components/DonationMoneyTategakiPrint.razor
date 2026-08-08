@@ -913,14 +913,19 @@
                     {
                         Settings.SelectedFont = DefaultFont;
                     }
-                    if (currentKeys.Any())
+
+                    if (Settings.PageEntryPersistentKeys == null || !Settings.PageEntryPersistentKeys.Any())
                     {
                         Settings.PageEntryPersistentKeys = currentKeys;
                     }
-                    else if (Settings.PageEntryPersistentKeys == null || !Settings.PageEntryPersistentKeys.Any())
+                    else
                     {
-                        Settings.PageEntryPersistentKeys = new List<string>();
+                        Settings.PageEntryPersistentKeys = Settings.PageEntryPersistentKeys
+                            .Where(key => !string.IsNullOrWhiteSpace(key))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList();
                     }
+
                     await SaveSettingsAsync();
                     ResetPages();
                     StateHasChanged();
@@ -1047,13 +1052,37 @@
         PagedPages = new List<List<PrintableEntry>>();
         if (State.Items == null || !State.Items.Any()) return;
 
+        var orderedItems = State.Items.ToList();
+        if (Settings.PageEntryPersistentKeys != null && Settings.PageEntryPersistentKeys.Any())
+        {
+            var orderedKeys = Settings.PageEntryPersistentKeys
+                .Where(key => !string.IsNullOrWhiteSpace(key))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var keyedItems = orderedItems
+                .Where(item => orderedKeys.Contains($"{item.Id}", StringComparer.OrdinalIgnoreCase))
+                .OrderBy(item =>
+                {
+                    var index = orderedKeys.FindIndex(key => string.Equals(key, $"{item.Id}", StringComparison.OrdinalIgnoreCase));
+                    return index >= 0 ? index : int.MaxValue;
+                })
+                .ToList();
+
+            var remainingItems = orderedItems
+                .Where(item => !orderedKeys.Contains($"{item.Id}", StringComparer.OrdinalIgnoreCase))
+                .ToList();
+
+            orderedItems = keyedItems.Concat(remainingItems).ToList();
+        }
+
         var currentPage = new List<PrintableEntry>();
         double currentWidthSum = 0;
         double effectiveMax = Settings.MaxPageWidthUnits - 0.05;
 
         decimal? previousAmount = null;
 
-        foreach (var item in State.Items)
+        foreach (var item in orderedItems)
         {
             if (previousAmount.HasValue && previousAmount.Value != item.Amount)
             {
