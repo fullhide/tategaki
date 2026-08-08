@@ -13,6 +13,7 @@ namespace TategakiPrint.Models
         public double SpacerWidth { get; set; } = 1.0;
         public double NameTopOffset { get; set; } = 14.0;
         public double AmountTopOffset { get; set; } = -170.0;
+        public string LastSelectedSheetName { get; set; } = string.Empty;
         /// <summary>
         /// 各ページのエントリ数を表す一覧
         /// </summary>

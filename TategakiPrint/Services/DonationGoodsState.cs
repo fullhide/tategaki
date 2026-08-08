@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.JSInterop;
 using MiniExcelLibs;
@@ -24,6 +25,10 @@ namespace TategakiPrint.Services
         public string SelectedSheetName { get; set; } = string.Empty;
         public string? ErrorMessage { get; set; }
         public bool IsLoading { get; set; }
+        public string LastLoadedWorkbookName { get; private set; } = string.Empty;
+        public string LastLoadedSheetName { get; private set; } = string.Empty;
+        public DateTime? LastLoadedAt { get; private set; }
+        private string CurrentWorkbookName { get; set; } = string.Empty;
 
         public event Action? OnChange;
 
@@ -118,6 +123,10 @@ namespace TategakiPrint.Services
                 {
                     Items = validGoods;
                     SortItems();
+                    await SaveLastSelectedSheetNameAsync(js, SelectedSheetName);
+                    LastLoadedWorkbookName = CurrentWorkbookName;
+                    LastLoadedSheetName = SelectedSheetName;
+                    LastLoadedAt = DateTime.Now;
                 }
                 else
                 {
@@ -149,18 +158,68 @@ namespace TategakiPrint.Services
             return "";
         }
 
+        private async Task<string?> GetLastSelectedSheetNameAsync(IJSRuntime js)
+        {
+            try
+            {
+                var json = await js.InvokeAsync<string>("localStorage.getItem", LocalStorageKey);
+                if (!string.IsNullOrWhiteSpace(json))
+                {
+                    var loaded = JsonSerializer.Deserialize<DonationGoodsPrintSettings>(json);
+                    return loaded?.LastSelectedSheetName;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private async Task SaveLastSelectedSheetNameAsync(IJSRuntime js, string sheetName)
+        {
+            try
+            {
+                var json = await js.InvokeAsync<string>("localStorage.getItem", LocalStorageKey);
+                DonationGoodsPrintSettings settings = !string.IsNullOrWhiteSpace(json)
+                    ? JsonSerializer.Deserialize<DonationGoodsPrintSettings>(json) ?? new DonationGoodsPrintSettings()
+                    : new DonationGoodsPrintSettings();
+
+                settings.LastSelectedSheetName = sheetName;
+                var updatedJson = JsonSerializer.Serialize(settings);
+                await js.InvokeVoidAsync("localStorage.setItem", LocalStorageKey, updatedJson);
+            }
+            catch { }
+        }
+
         private void NotifyStateChanged() => OnChange?.Invoke();
 
         // --- ファイル受信とシート名取得 (Stream引数版) ---
-        public async Task SetFileAsync(Stream stream, IJSRuntime js)
+        public async Task SetFileAsync(Stream stream, IJSRuntime js, string workbookName = "")
         {
-            using var ms = new MemoryStream();
-            await stream.CopyToAsync(ms);
-            await SetFileAsync(ms.ToArray(), js);
+            IsLoading = true;
+            ErrorMessage = null;
+            SheetNames.Clear();
+            FileBytes = null;
+            CurrentWorkbookName = workbookName;
+            NotifyStateChanged();
+
+            try
+            {
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                await SetFileAsync(ms.ToArray(), js, notify: false);
+            }
+            catch (Exception ex)
+            {
+                ErrorMessage = $"ファイル読み込みエラー:\n{ex.Message}";
+            }
+            finally
+            {
+                IsLoading = false;
+                NotifyStateChanged();
+            }
         }
 
         // --- バイト配列版の既存メソッド ---
-        public async Task SetFileAsync(byte[] bytes, IJSRuntime js)
+        public async Task SetFileAsync(byte[] bytes, IJSRuntime js, bool notify = true)
         {
             FileBytes = bytes;
             SheetNames.Clear();
@@ -174,7 +233,16 @@ namespace TategakiPrint.Services
 
                 if (SheetNames.Any())
                 {
-                    SelectedSheetName = SheetNames.First();
+                    string? lastSheet = await GetLastSelectedSheetNameAsync(js);
+                    if (!string.IsNullOrEmpty(lastSheet) && SheetNames.Contains(lastSheet))
+                    {
+                        SelectedSheetName = lastSheet;
+                    }
+                    else
+                    {
+                        SelectedSheetName = SheetNames.First();
+                        await SaveLastSelectedSheetNameAsync(js, SelectedSheetName);
+                    }
                 }
             }
             catch (Exception ex)
@@ -182,15 +250,18 @@ namespace TategakiPrint.Services
                 ErrorMessage = $"Excel解析エラー:\n{ex.Message}";
             }
             
-            NotifyStateChanged();
+            if (notify)
+            {
+                NotifyStateChanged();
+            }
         }
 
         // --- シート名変更メソッド ---
         public async Task ChangeSheetNameAsync(string sheetName, IJSRuntime js)
         {
             SelectedSheetName = sheetName;
+            await SaveLastSelectedSheetNameAsync(js, sheetName);
             NotifyStateChanged();
-            await Task.CompletedTask;
         } 
     }
 }

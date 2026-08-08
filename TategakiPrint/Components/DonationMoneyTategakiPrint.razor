@@ -7,7 +7,7 @@
 
 <!-- 上部固定操作パネル（sticky-top-panel） -->
 <div class="card p-3 mb-4 shadow-sm no-print bg-light sticky-top-panel">
-    <div class="d-flex justify-content-end align-items-center">
+    <div class="d-flex justify-content-center align-items-center">
         <!-- 右側：設定・印刷・操作ボタン群 -->
         <div class="d-flex gap-2 align-items-center">
             <!-- 個別空行の非表示ボタン -->
@@ -38,21 +38,8 @@
                 ⚙ 詳細設定 @(showAdvancedSettings ? "▲" : "▼")
             </button>
 
-            <!-- ファイル入出力ボタン -->
-            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ExportSettingsAsync" title="現在の設定をJSONファイルとしてダウンロードします">
-                📥 設定エクスポート
-            </button>
-            
-            <label class="btn btn-outline-secondary btn-sm mb-0 position-relative" title="設定ファイル(JSON)を読み込みます">
-                📤 設定インポート
-                <InputFile OnChange="ImportSettingsAsync" accept=".json" style="position:absolute; left:0; top:0; opacity:0; width:100%; height:100%; cursor:pointer;" />
-            </label>
-
-            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="ResetSettingsToDefaultAsync" title="設定パラメータを初期値に戻します">
-                リセット
-            </button>
             <button type="button" class="btn btn-outline-primary btn-sm" @onclick="ResetPages">
-                🔄 自動レイアウト初期化
+                🔄 ページ割り復元
             </button>
             <button type="button" class="btn btn-success px-4 font-weight-bold ms-2" @onclick="Print">
                 🖨 印刷する (A4横)
@@ -208,6 +195,20 @@
                         <input type="number" class="form-control form-control-sm text-center" style="width: 75px;" min="-100" max="150" step="1" value="@Settings.AmountTopOffset" @onchange="OnAmountTopOffsetInputAsync" />
                     </div>
                 </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 align-items-center pt-3 mt-3 border-top">
+                <span class="small text-muted fw-semibold me-2">設定ファイル</span>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ExportSettingsAsync" title="現在の設定をJSONファイルとしてダウンロードします">
+                    📥 設定エクスポート
+                </button>
+                <label class="btn btn-outline-secondary btn-sm mb-0 position-relative" title="設定ファイル(JSON)を読み込みます">
+                    📤 設定インポート
+                    <InputFile OnChange="ImportSettingsAsync" accept=".json" style="position:absolute; left:0; top:0; opacity:0; width:100%; height:100%; cursor:pointer;" />
+                </label>
+                <button type="button" class="btn btn-outline-danger btn-sm" @onclick="ResetSettingsToDefaultAsync" title="設定パラメータを初期値に戻します">
+                    設定を初期値に戻す
+                </button>
             </div>
         </div>
     }

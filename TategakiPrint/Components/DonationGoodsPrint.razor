@@ -8,14 +8,7 @@
 
 <!-- 操作パネル＆ファイル読み込みエリア -->
 <div class="card p-3 mb-4 shadow-sm no-print bg-light sticky-top-panel">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <h4 class="m-0">【寄付品】縦書きプレビュー・印刷</h4>
-            <small class="text-muted">
-                全 @(GoodsState.Items?.Count ?? 0) 件 / 全 @GroupedItems.Count 枠（全 @PagedPages.Count ページ）/ `*`順 ➔ 名前順
-            </small>
-        </div>
-
+    <div class="d-flex justify-content-center align-items-center">
         <div class="d-flex gap-2 align-items-center">
             <!-- 個別空行の非表示ボタン -->
             @if (IsSelectedSpacer)
@@ -45,20 +38,8 @@
                 ⚙ 詳細設定 @(showAdvancedSettings ? "▲" : "▼")
             </button>
 
-            <!-- 設定入出力ボタン -->
-            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ExportSettingsAsync" title="現在の設定をJSONファイルとしてダウンロードします">
-                📥 設定エクスポート
-            </button>
-            <label class="btn btn-outline-secondary btn-sm mb-0 position-relative" title="設定ファイル(JSON)を読み込みます">
-                📤 設定インポート
-                <InputFile OnChange="ImportSettingsAsync" accept=".json" style="position:absolute; left:0; top:0; opacity:0; width:100%; height:100%; cursor:pointer;" />
-            </label>
-
-            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="ResetSettingsToDefaultAsync" title="設定パラメータを初期値に戻します">
-                リセット
-            </button>
             <button type="button" class="btn btn-outline-primary btn-sm" @onclick="ResetPages">
-                🔄 自動レイアウト初期化
+                🔄 ページ割り復元
             </button>
             <button type="button" class="btn btn-success px-4 font-weight-bold ms-2" @onclick="Print" disabled="@(GoodsState.Items == null || !GoodsState.Items.Any())">
                 🖨 印刷する (A4横)
@@ -69,11 +50,11 @@
     <!-- Excelファイル取り込みパネル -->
     @if (showExcelImport)
     {
-        <div class="card p-3 mt-3 border-primary bg-white shadow-sm">
+        <div class="card p-3 mt-3 border-primary bg-white shadow-sm mx-auto" style="max-width: 1120px;">
             <h5 class="mb-2">Excelファイルの取り込み</h5>
             
             <div class="mb-3">
-                <div class="drop-zone p-3 text-center rounded border border-2 border-dashed position-relative bg-light">
+                <div class="drop-zone p-2 text-center rounded border border-2 border-dashed position-relative bg-light">
                     <div class="drop-zone-content">
                         <span class="fs-4 text-primary me-2">📁</span>
                         <span class="fw-bold text-secondary">
@@ -86,7 +67,7 @@
 
             @if (GoodsState.SheetNames != null && GoodsState.SheetNames.Any())
             {
-                <div class="row g-2 align-items-center mb-2">
+                <div class="row g-2 align-items-center mb-0">
                     <div class="col-auto">
                         <label class="col-form-label fw-bold">シート選択:</label>
                     </div>
@@ -216,6 +197,20 @@
                         <input type="number" class="form-control form-control-sm text-center" style="width: 75px;" min="-500" max="1000" step="1" value="@Settings.AmountTopOffset" @onchange="OnAmountTopOffsetInputAsync" />
                     </div>
                 </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 align-items-center pt-3 mt-3 border-top">
+                <span class="small text-muted fw-semibold me-2">設定ファイル</span>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ExportSettingsAsync" title="現在の設定をJSONファイルとしてダウンロードします">
+                    📥 設定エクスポート
+                </button>
+                <label class="btn btn-outline-secondary btn-sm mb-0 position-relative" title="設定ファイル(JSON)を読み込みます">
+                    📤 設定インポート
+                    <InputFile OnChange="ImportSettingsAsync" accept=".json" style="position:absolute; left:0; top:0; opacity:0; width:100%; height:100%; cursor:pointer;" />
+                </label>
+                <button type="button" class="btn btn-outline-danger btn-sm" @onclick="ResetSettingsToDefaultAsync" title="設定パラメータを初期値に戻します">
+                    設定を初期値に戻す
+                </button>
             </div>
         </div>
     }
@@ -676,7 +671,7 @@ else
     private async Task OnExcelFileSelected(InputFileChangeEventArgs e)
     {
         using var stream = e.File.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024);
-        await GoodsState.SetFileAsync(stream, JS);
+        await GoodsState.SetFileAsync(stream, JS, e.File.Name);
         StateHasChanged();
     }
 
