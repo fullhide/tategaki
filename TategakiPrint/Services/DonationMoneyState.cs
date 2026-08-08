@@ -54,7 +54,11 @@ namespace TategakiPrint.Services
             NotifyStateChanged();
         }
 
-        public void ShowPrint() => SetView(ViewMode.Print);
+        public void ShowPrint()
+        {
+            SortItems();
+            SetView(ViewMode.Print);
+        }
         public void ShowEdit() => SetView(ViewMode.Edit);
 
         public void SortItems()

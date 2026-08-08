@@ -603,7 +603,8 @@
 @code {
     [Inject] IJSRuntime JS { get; set; } = default!;
 
-    private const string LocalStorageKey = "TategakiPrint_Settings";
+    private const string LocalStorageKey = "TategakiPrint_DonationMoney_Settings";
+    private const string LegacyLocalStorageKey = "TategakiPrint_Settings";
     private const string DefaultFont = "\"HG行書体\", \"HGP行書体\", \"Kaiti SC\", \"STKaiti\", \"Yu Mincho\", serif";
 
     private bool showAdvancedSettings = false;
@@ -830,6 +831,14 @@
         try
         {
             var json = await JS.InvokeAsync<string>("localStorage.getItem", LocalStorageKey);
+            bool loadedFromLegacy = false;
+
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                json = await JS.InvokeAsync<string>("localStorage.getItem", LegacyLocalStorageKey);
+                loadedFromLegacy = !string.IsNullOrWhiteSpace(json);
+            }
+
             if (!string.IsNullOrWhiteSpace(json))
             {
                 var loaded = JsonSerializer.Deserialize<DonationMoneyPrintSettings>(json);
@@ -843,6 +852,12 @@
 
                     await State.SetSortOrderAsync(JS, Settings.SortOrder, applySort: true);
                     Settings.SortOrder = State.SortOrder.ToList();
+
+                    if (loadedFromLegacy)
+                    {
+                        await SaveSettingsAsync();
+                        await JS.InvokeVoidAsync("localStorage.removeItem", LegacyLocalStorageKey);
+                    }
                 }
             }
         }

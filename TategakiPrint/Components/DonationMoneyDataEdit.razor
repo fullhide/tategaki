@@ -17,10 +17,10 @@
         <!-- 右側：アクションボタン群 -->
         <div class="d-flex gap-2">
             <button type="button" class="btn btn-outline-primary" @onclick="ToggleImportPanel">
-                📁 Excel取り込み @(showImportPanel ? "▲" : "▼")
+                📁 Excel読み込み @(showImportPanel ? "▲" : "▼")
             </button>
             <button type="button" class="btn btn-outline-dark" @onclick="ToggleSortConfigPanel">
-                ↕ 並べ替え設定 @(showSortConfigPanel ? "▲" : "▼")
+                ⚙ 並べ替え設定 @(showSortConfigPanel ? "▲" : "▼")
             </button>
             <button type="button" class="btn btn-outline-secondary" @onclick="ReSort">
                 🔄 指定順でソート再実行
@@ -58,11 +58,11 @@
     <!-- Excelファイル取り込み展開パネル -->
     @if (showImportPanel)
     {
-        <div class="card p-3 mb-3 border-primary bg-white shadow-sm">
+        <div class="card p-3 mt-3 border-primary bg-white shadow-sm mx-auto" style="max-width: 1120px;">
             <h5 class="mb-2">Excelファイルの取り込み</h5>
             
             <div class="mb-3">
-                <div class="drop-zone p-3 text-center rounded border border-2 border-dashed position-relative bg-light">
+                <div class="drop-zone p-2 text-center rounded border border-2 border-dashed position-relative bg-light">
                     <div class="drop-zone-content">
                         <span class="fs-4 text-primary me-2">📁</span>
                         <span class="fw-bold text-secondary">
@@ -75,7 +75,7 @@
 
             @if (State.SheetNames.Any())
             {
-                <div class="row g-2 align-items-center mb-2">
+                <div class="row g-2 align-items-center mb-0">
                     <div class="col-auto">
                         <label class="col-form-label fw-bold">シート選択:</label>
                     </div>
@@ -205,8 +205,23 @@
         StateHasChanged();
     }
 
-    private void ToggleImportPanel() => showImportPanel = !showImportPanel;
-    private void ToggleSortConfigPanel() => showSortConfigPanel = !showSortConfigPanel;
+    private void ToggleImportPanel()
+    {
+        showImportPanel = !showImportPanel;
+        if (showImportPanel)
+        {
+            showSortConfigPanel = false;
+        }
+    }
+
+    private void ToggleSortConfigPanel()
+    {
+        showSortConfigPanel = !showSortConfigPanel;
+        if (showSortConfigPanel)
+        {
+            showImportPanel = false;
+        }
+    }
     private void ReSort() => State.SortItems();
 
     private string GetSortLabel(string sortKey)
