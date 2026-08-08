@@ -14,7 +14,7 @@
 - [TategakiPrint/Components/DonationMoneyTategakiPrint.razor](TategakiPrint/Components/DonationMoneyTategakiPrint.razor): 印刷プレビューとレイアウト制御
 - [TategakiPrint/Services/DonationMoneyState.cs](TategakiPrint/Services/DonationMoneyState.cs): データ読み込み・ソート・画面状態管理
 - [TategakiPrint/Models/DonationMoneyItem.cs](TategakiPrint/Models/DonationMoneyItem.cs): 寄付金データモデル
-- [TategakiPrint/Models/PrintSettings.cs](TategakiPrint/Models/PrintSettings.cs): 寄付金用印刷設定モデル（`DonationMoneyPrintSettings`）
+- [TategakiPrint/Models/DonationMoneyPrintSettings.cs](TategakiPrint/Models/DonationMoneyPrintSettings.cs): 寄付金用印刷設定モデル（`DonationMoneyPrintSettings`）
 
 ### 寄付品フロー
 - [TategakiPrint/Pages/DonationGoodsHome.razor](TategakiPrint/Pages/DonationGoodsHome.razor): 寄付品画面の入口
@@ -29,8 +29,8 @@
 - 寄付品は氏名・品物・数量・単位・ソートキーを扱い、ソート順はソートキー順・氏名順
 - 印刷レイアウトでは縦書き CSS とページ分割ロジックを利用する
 - 設定は localStorage に保存し、JSON でエクスポート / インポートできる
-- ページ境界の手動調整結果は、元データの永続キーに紐づけて保存し、再読み込みや設定インポート時には現在の表示内容を優先して復元する
-- エクスポート時は現在のページ境界情報を設定データに反映し、インポート時は設定ファイル内の情報を読み込んだうえで、現行の表示状態を優先してページ復元に使用する
+- ページ境界の手動調整結果は、各ページのエントリ数として保存し、再読み込みや設定インポート時には現在の表示内容を優先して復元する
+- エクスポート時は現在のページ境界情報を設定データに反映し、インポート時は設定ファイル内のページごとのエントリ数を読み込んだうえで、現行の表示状態を優先してページ復元に使用する
 - これは、ユーザーが新しい Excel データを読み込んだ場合でも、現在見ているエントリの状態が意図せず上書きされないようにするための実装である
 - 画面上部にバージョン表示を追加し、共有レイアウトで表示する
 - Excel 取り込みパネルと詳細設定パネルは排他的に開くようにする
