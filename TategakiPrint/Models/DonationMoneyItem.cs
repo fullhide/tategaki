@@ -2,7 +2,7 @@ using MiniExcelLibs.Attributes;
 
 namespace TategakiPrint.Models;
 
-public class DonationItem
+public class DonationMoneyItem
 {
     /// <summary>
     /// UI（Blazor）上での一元識別用ID（Excelのマッピング対象外）

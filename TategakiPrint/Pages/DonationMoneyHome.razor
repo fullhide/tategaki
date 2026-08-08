@@ -1,7 +1,7 @@
 @page "/"
 @using TategakiPrint.Services
 @using TategakiPrint.Components
-@inject DonationState State
+@inject DonationMoneyState State
 @implements IDisposable
 
 <PageTitle>寄付金一覧 縦書き印刷</PageTitle>
@@ -29,13 +29,13 @@
     @switch (State.CurrentView)
     {
         case ViewMode.Edit:
-            <DonationDataEdit />
+            <DonationMoneyDataEdit />
             break;
         case ViewMode.Print:
-            <DonationTategakiPrint />
+            <DonationMoneyTategakiPrint />
             break;
         default:
-            <DonationTategakiPrint />
+            <DonationMoneyTategakiPrint />
             break;
     }
 </div>

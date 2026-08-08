@@ -11,9 +11,9 @@ namespace TategakiPrint.Services
 {
     public class DonationGoodsState
     {
-        private const string LocalStorageKey = "TategakiPrint_Goods_Settings";
+        private const string LocalStorageKey = "TategakiPrint_DonationGoods_Settings";
 
-        public List<GoodsItem> Items { get; set; } = new();
+        public List<DonationGoodsItem> Items { get; set; } = new();
 
         // ビュー状態（初期値は印刷表示）
         public ViewMode CurrentView { get; private set; } = ViewMode.Print;
@@ -81,7 +81,7 @@ namespace TategakiPrint.Services
                     return;
                 }
 
-                var validGoods = new List<GoodsItem>();
+                var validGoods = new List<DonationGoodsItem>();
                 int skippedRowsCount = 0;
 
                 foreach (var row in rows)
@@ -104,7 +104,7 @@ namespace TategakiPrint.Services
                         continue;
                     }
 
-                    validGoods.Add(new GoodsItem
+                    validGoods.Add(new DonationGoodsItem
                     {
                         Name = name.Trim(),
                         ItemName = itemName.Trim(),

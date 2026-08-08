@@ -2,7 +2,7 @@
 @using System.Text.Json
 @using TategakiPrint.Models
 @using TategakiPrint.Services
-@inject DonationState State
+@inject DonationMoneyState State
 @implements IDisposable
 
 <!-- 上部固定操作パネル（sticky-top-panel） -->
@@ -70,7 +70,7 @@
         </div>
     </div>
 
-    <!-- Excelファイル取り込みパネル（DonationDataEditと共通状態を参照） -->
+    <!-- Excelファイル取り込みパネル（DonationMoneyDataEditと共通状態を参照） -->
     @if (showExcelImport)
     {
         <div class="card p-3 mt-3 border-primary bg-white shadow-sm">
@@ -297,7 +297,7 @@
 </div>
 
 <style>
-    /* ドロップゾーン（DonationDataEdit と統一） */
+    /* ドロップゾーン（DonationMoneyDataEdit と統一） */
     .drop-zone {
         border-color: #0d6efd !important;
         transition: background-color 0.2s ease;
@@ -621,7 +621,7 @@
     public class PrintableEntry
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
-        public DonationItem? Item { get; set; }
+        public DonationMoneyItem? Item { get; set; }
         public bool IsSpacer { get; set; }
     }
 
@@ -691,7 +691,7 @@
     private void ToggleAdvancedSettings() => showAdvancedSettings = !showAdvancedSettings;
     private void ToggleExcelImportPanel() => showExcelImport = !showExcelImport;
 
-    #region Excel読み込み処理 (DonationStateに委譲)
+    #region Excel読み込み処理 (DonationMoneyStateに委譲)
 
     private async Task OnExcelFileSelected(InputFileChangeEventArgs e)
     {

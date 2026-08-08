@@ -111,7 +111,10 @@
 - 直接 `main` にコミットしない。
 - `feature/use-ai-start` のような専用ブランチで作業する。
 - 変更後は `dotnet build ./TategakiPrint/TategakiPrint.csproj` を実行し、ビルドエラーや警告がないことを確認する。
-- 既存機能に影響する改修では、`DonationState` / `DonationGoodsState` の Excel 解析ロジックと `ResetPages()` のページ分割ロジックを重点的に確認する。
+- 既存機能に影響する改修では、`DonationMoneyState` / `DonationGoodsState` の Excel 解析ロジックと `ResetPages()` のページ分割ロジックを重点的に確認する。
+- 命名は「寄付金」と「寄付品」を明示するため、共通基盤は `Donation` で統一し、差分は `Money` / `Goods` で表す。
+  - 例: `DonationMoneyState`, `DonationMoneyItem`, `DonationGoodsState`, `DonationGoodsItem`
+  - 画面ファイル名も `DonationMoneyHome`, `DonationGoodsHome` のように明示する。
 
 ## 7. 参考情報
 - `TategakiPrint/TategakiPrint.csproj`: Blazor WebAssembly アプリ構成。

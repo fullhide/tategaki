@@ -1,6 +1,6 @@
 namespace TategakiPrint.Models
 {
-    public class GoodsItem
+    public class DonationGoodsItem
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "";

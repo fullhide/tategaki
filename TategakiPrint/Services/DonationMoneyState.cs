@@ -10,12 +10,12 @@ using TategakiPrint.Models;
 
 namespace TategakiPrint.Services
 {
-    public class DonationState
+    public class DonationMoneyState
     {
-        private const string LocalStorageKey = "TategakiPrint_Settings";
+        private const string LocalStorageKey = "TategakiPrint_DonationMoney_Settings";
 
         // 既存のプロパティ
-        public List<DonationItem> Items { get; set; } = new();
+        public List<DonationMoneyItem> Items { get; set; } = new();
 
         // 画面切り替え状態（初期表示を Print に設定）
         public ViewMode CurrentView { get; private set; } = ViewMode.Print;
@@ -123,7 +123,7 @@ namespace TategakiPrint.Services
                                  .Cast<IDictionary<string, object>>()
                                  .ToList();
 
-                var validItems = new List<DonationItem>();
+                var validItems = new List<DonationMoneyItem>();
 
                 for (int i = 0; i < rows.Count; i++)
                 {
@@ -142,7 +142,7 @@ namespace TategakiPrint.Services
 
                     if (decimal.TryParse(cleanedAmount, out decimal amount) && amount > 0 && !string.IsNullOrWhiteSpace(name))
                     {
-                        validItems.Add(new DonationItem
+                        validItems.Add(new DonationMoneyItem
                         {
                             Name = name.Trim(),
                             Kana = kana.Trim(),

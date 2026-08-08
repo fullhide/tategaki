@@ -564,7 +564,7 @@ else
 </style>
 
 @code {
-    private const string LocalStorageKey = "TategakiPrint_Goods_Settings_v2";
+    private const string LocalStorageKey = "TategakiPrint_DonationGoods_Settings_v2";
     private const string DefaultFont = "\"HG行書体\", \"HGP行書体\", \"Kaiti SC\", \"STKaiti\", \"Yu Mincho\", serif";
     private static readonly char[] NameSeparators = new[] { '/', '／', '\r', '\n' };
 
@@ -575,7 +575,7 @@ else
     {
         public string Name { get; set; } = string.Empty;
         public int SortKey { get; set; }
-        public List<GoodsItem> Items { get; set; } = new();
+        public List<DonationGoodsItem> Items { get; set; } = new();
     }
 
     public class PrintableGoodsEntry
