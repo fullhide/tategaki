@@ -652,8 +652,23 @@ else
         }
     }
 
-    private void ToggleAdvancedSettings() => showAdvancedSettings = !showAdvancedSettings;
-    private void ToggleExcelImportPanel() => showExcelImport = !showExcelImport;
+    private void ToggleAdvancedSettings()
+    {
+        showAdvancedSettings = !showAdvancedSettings;
+        if (showAdvancedSettings)
+        {
+            showExcelImport = false;
+        }
+    }
+
+    private void ToggleExcelImportPanel()
+    {
+        showExcelImport = !showExcelImport;
+        if (showExcelImport)
+        {
+            showAdvancedSettings = false;
+        }
+    }
 
     #region ファイル・シート制御
 
