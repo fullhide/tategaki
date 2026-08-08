@@ -581,6 +581,7 @@ else
     public class PrintableGoodsEntry
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string PersistentKey { get; set; } = string.Empty;
         public GoodsGroup? Group { get; set; }
         public bool IsSpacer { get; set; }
     }
@@ -730,6 +731,15 @@ else
         return $"flex: 0 0 {totalWidth}px;";
     }
 
+    private List<string> GetCurrentPageEntryPersistentKeys()
+    {
+        return PagedPages
+            .SelectMany(page => page)
+            .Where(entry => !entry.IsSpacer && !string.IsNullOrWhiteSpace(entry.PersistentKey))
+            .Select(entry => entry.PersistentKey)
+            .ToList();
+    }
+
     private void ResetPages()
     {
         PagedPages = new List<List<PrintableGoodsEntry>>();
@@ -768,6 +778,8 @@ else
 
             currentPage.Add(new PrintableGoodsEntry
             {
+                Id = $"entry-{group.Items.FirstOrDefault()?.Id ?? Guid.NewGuid().ToString()}",
+                PersistentKey = group.Items.FirstOrDefault()?.Id ?? Guid.NewGuid().ToString(),
                 Group = group,
                 IsSpacer = false
             });
@@ -965,6 +977,7 @@ else
     {
         try
         {
+            Settings.PageEntryPersistentKeys = GetCurrentPageEntryPersistentKeys();
             var json = JsonSerializer.Serialize(Settings);
             await JS.InvokeVoidAsync("localStorage.setItem", LocalStorageKey, json);
         }
@@ -980,6 +993,7 @@ else
 
     private async Task ExportSettingsAsync()
     {
+        Settings.PageEntryPersistentKeys = GetCurrentPageEntryPersistentKeys();
         var json = JsonSerializer.Serialize(Settings, new JsonSerializerOptions { WriteIndented = true });
         var fileName = $"寄付品縦書き設定_{DateTime.Now:yyyyMMdd_HHmmss}.json";
         
@@ -1011,8 +1025,17 @@ else
                 var loaded = JsonSerializer.Deserialize<DonationGoodsPrintSettings>(json);
                 if (loaded != null)
                 {
+                    var currentKeys = GetCurrentPageEntryPersistentKeys();
                     Settings = loaded;
                     if (string.IsNullOrWhiteSpace(Settings.SelectedFont)) Settings.SelectedFont = DefaultFont;
+                    if (currentKeys.Any())
+                    {
+                        Settings.PageEntryPersistentKeys = currentKeys;
+                    }
+                    else if (Settings.PageEntryPersistentKeys == null || !Settings.PageEntryPersistentKeys.Any())
+                    {
+                        Settings.PageEntryPersistentKeys = new List<string>();
+                    }
                     await SaveSettingsAsync();
                     ResetPages();
                     StateHasChanged();

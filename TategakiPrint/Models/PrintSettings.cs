@@ -27,4 +27,6 @@ public class PrintSettings
     public double SpacerWidth { get; set; } = 1.0;
 
     public string LastSelectedSheetName{get;set;} = string.Empty;
+
+    public List<string> PageEntryPersistentKeys { get; set; } = new();
 }

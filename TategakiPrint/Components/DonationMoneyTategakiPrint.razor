@@ -621,6 +621,7 @@
     public class PrintableEntry
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string PersistentKey { get; set; } = string.Empty;
         public DonationMoneyItem? Item { get; set; }
         public bool IsSpacer { get; set; }
     }
@@ -858,6 +859,7 @@
     {
         try
         {
+            Settings.PageEntryPersistentKeys = GetCurrentPageEntryPersistentKeys();
             var json = JsonSerializer.Serialize(Settings);
             await JS.InvokeVoidAsync("localStorage.setItem", LocalStorageKey, json);
         }
@@ -873,6 +875,7 @@
 
     private async Task ExportSettingsAsync()
     {
+        Settings.PageEntryPersistentKeys = GetCurrentPageEntryPersistentKeys();
         var json = JsonSerializer.Serialize(Settings, new JsonSerializerOptions { WriteIndented = true });
         var fileName = $"寄付金縦書き設定_{DateTime.Now:yyyyMMdd_HHmmss}.json";
         
@@ -904,10 +907,19 @@
                 var loaded = JsonSerializer.Deserialize<PrintSettings>(json);
                 if (loaded != null)
                 {
+                    var currentKeys = GetCurrentPageEntryPersistentKeys();
                     Settings = loaded;
                     if (string.IsNullOrWhiteSpace(Settings.SelectedFont))
                     {
                         Settings.SelectedFont = DefaultFont;
+                    }
+                    if (currentKeys.Any())
+                    {
+                        Settings.PageEntryPersistentKeys = currentKeys;
+                    }
+                    else if (Settings.PageEntryPersistentKeys == null || !Settings.PageEntryPersistentKeys.Any())
+                    {
+                        Settings.PageEntryPersistentKeys = new List<string>();
                     }
                     await SaveSettingsAsync();
                     ResetPages();
@@ -1021,6 +1033,15 @@
 
     #endregion
 
+    private List<string> GetCurrentPageEntryPersistentKeys()
+    {
+        return PagedPages
+            .SelectMany(page => page)
+            .Where(entry => !entry.IsSpacer && !string.IsNullOrWhiteSpace(entry.PersistentKey))
+            .Select(entry => entry.PersistentKey)
+            .ToList();
+    }
+
     private void ResetPages()
     {
         PagedPages = new List<List<PrintableEntry>>();
@@ -1065,7 +1086,7 @@
                 currentWidthSum = 0;
             }
 
-            currentPage.Add(new PrintableEntry { Item = item, IsSpacer = false });
+            currentPage.Add(new PrintableEntry { Id = $"entry-{item.Id}", PersistentKey = $"{item.Id}", Item = item, IsSpacer = false });
             currentWidthSum += itemWidth;
         }
 
